@@ -1,5 +1,10 @@
 # moodspy
 
+[![tests](https://github.com/vmindel/moodspy/actions/workflows/tests.yml/badge.svg)](https://github.com/vmindel/moodspy/actions/workflows/tests.yml)
+[![docs](https://img.shields.io/badge/docs-vmindel.github.io%2Fmoodspy-teal)](https://vmindel.github.io/moodspy/)
+
+**Documentation:** <https://vmindel.github.io/moodspy/>
+
 Fast position weight matrix (PWM) motif matching for Python. It is a modern rewrite of
 [MOODS](https://github.com/jhkorhonen/MOODS) with an API modelled on the R/Bioconductor
 package [motifmatchr](https://github.com/GreenleafLab/motifmatchr).

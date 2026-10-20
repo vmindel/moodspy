@@ -43,6 +43,16 @@ res.to_anndata()             # obs = sequences, var = motifs, X = matches, layer
   Categoricals**. Under pandas < 3, `groupby` on them defaults to
   `observed=False` and returns every category combination, including
   zero-count ones. Always pass `observed=True`, or `.astype(str)` first.
+- **Palindromic motifs hit twice.** AP-1 (`TGASTCA`), GRE/IR3, RELA and other
+  near-palindromes match one site on `+` and `-`, usually offset by 0–2 bp.
+  `mp.remove_overlaps(hits)` keeps the best hit of each overlapping
+  opposite-strand pair. `strands="any"` also collapses same-strand overlaps
+  (non-maximum suppression per seq and motif), and `min_overlap=` sets how
+  many shared bases count as overlapping. `out="scores"` counts include both
+  strands, as in motifmatchr. To count sites rather than strand hits, use
+  `remove_overlaps(...).groupby(["seq", "motif"], observed=True).size()`.
+- Duplicate input regions give duplicate hit rows, since every region is
+  scanned. Deduplicate peaks first, e.g. `peaks.drop_duplicates(["chrom", "start", "end"])`.
 - Positions at loose `p_cutoff` over many sequences can run to tens of
   millions of rows. If you only need per-sequence summaries, use
   `out="scores"`, which aggregates inside the kernel.

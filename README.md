@@ -183,7 +183,9 @@ moodspy reproduces motifmatchr exactly with `motifmatchr_compat=True`, with one 
    skips hits that end exactly at the end of a sequence or right before an `N`
    (`size < end - i` should be `<=`). moodspy reports them in both modes.
 
-Other conventions: both strands are always scanned. Reverse-strand hits report the
+Other conventions: both strands are always scanned, so palindromic motifs (AP-1, GRE,
+...) hit one site on both strands. `mp.remove_overlaps(hits)` keeps the best hit of each
+overlapping pair. Reverse-strand hits report the
 forward-strand start of the site and the reverse-complement matrix score. Characters other
 than `ACGTacgt` (N, IUPAC codes) never match. Scores are log2 odds.
 

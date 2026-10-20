@@ -4,6 +4,7 @@ from importlib.metadata import PackageNotFoundError, version
 
 from .datasets import example_motifs
 from .genome import FastaFile, read_bed, read_fasta, regions_frame
+from .hits import remove_overlaps
 from .io import (
     parse_homer,
     parse_jaspar,
@@ -41,6 +42,7 @@ __all__ = [
     "read_fasta",
     "read_motifs",
     "regions_frame",
+    "remove_overlaps",
     "threshold_from_p",
     "thresholds_from_p",
     "write_jaspar",

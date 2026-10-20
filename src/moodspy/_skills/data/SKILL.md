@@ -43,6 +43,8 @@ random sample of sequences by brute force and compares the hits with
   pseudocount: `(n + 0.25 * 0.8) / (N + 0.8)`.
 - Both strands are always scanned. A `-` hit reports the forward-strand
   `start`/`end` of the site and the score of the reverse-complement matrix.
+  Palindromic motifs therefore hit one site twice; `mp.remove_overlaps(hits)`
+  collapses those pairs.
 - Characters other than `ACGTacgt` (N, IUPAC codes) never match.
   Soft-masked lowercase does match.
 - Results are SciPy CSR matrices (`matches` bool, `counts` int32,

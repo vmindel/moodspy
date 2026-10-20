@@ -125,6 +125,30 @@ print(seqs[row.seq][row.start:row.end])
 GCCCCGCCCC
 ```
 
+### Palindromes and strand pairs
+
+`MA0107.1_RELA` (`GGGAATTTCC`) is close to its own reverse complement. The site in
+`rela_site` therefore matches on `+` at 3 and again on `-` at 4, overlapping almost
+completely. AP-1 (`TGASTCA`), GRE and other inverted repeats behave the same way.
+[`remove_overlaps`][moodspy.remove_overlaps] keeps the best-scoring hit of each such
+pair:
+
+```python
+print(mp.remove_overlaps(hits))
+```
+
+```text
+           motif        seq  start  end strand      score
+0  MA0599.1_KLF5   klf_site      4   14      +  15.543401
+1  MA0107.1_RELA  rela_site      3   13      +  16.878390
+3  MA0599.1_KLF5       both      0   10      +  15.543401
+5  MA0107.1_RELA       both     14   24      -  16.878390
+```
+
+`strands="any"` also removes overlapping hits on the same strand, so that no two kept
+hits of a motif overlap. Hit counts from `out="scores"` count both strands, as in
+motifmatchr.
+
 ## The background
 
 By default (`bg="subject"`), the nucleotide background comes from the sequences being

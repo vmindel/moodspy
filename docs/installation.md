@@ -31,6 +31,13 @@ takes a few seconds. The compiled code is cached on disk, so later runs start
 immediately. On clusters with read-only environments, set `NUMBA_CACHE_DIR` to a
 writable directory.
 
+## Caches
+
+moodspy stores FASTA indexes for read-only reference directories, and genome-wide base
+counts for `bg="genome"`, in `~/.cache/moodspy`. Set `MOODSPY_CACHE_DIR` to put them
+somewhere else. The files are small: one `.fai` and one JSON file per genome, keyed by
+the FASTA's path, size and modification time.
+
 ## Building these docs
 
 ```bash

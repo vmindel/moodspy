@@ -8,6 +8,12 @@ from moodspy._alphabet import encode
 DATA = Path(__file__).parent / "data"
 
 
+@pytest.fixture(autouse=True)
+def _isolated_cache(tmp_path_factory, monkeypatch):
+    """Keep moodspy's index / base-count cache out of the user's home."""
+    monkeypatch.setenv("MOODSPY_CACHE_DIR", str(tmp_path_factory.mktemp("moodspy_cache")))
+
+
 @pytest.fixture
 def rng():
     return np.random.default_rng(12345)

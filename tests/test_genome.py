@@ -82,3 +82,123 @@ def test_build_fai_offsets():
         idx = _build_fai(mm)
     assert idx == {"x": (3, 3, 2, 3), "y": (4, 16, 4, 5)}
     assert np.isscalar(idx["x"][0])
+
+
+def _reference_fai(data: bytes):
+    """The original line-by-line indexer, kept as an oracle for _build_fai."""
+    index, pos, size, name = {}, 0, len(data), None
+    length = offset = lb = lw = 0
+    irregular = False
+    while pos < size:
+        nl = data.find(b"\n", pos)
+        nl = size if nl < 0 else nl
+        line, nxt = data[pos:nl], nl + 1
+        if line.startswith(b">"):
+            if name is not None:
+                index[name] = (length, offset, lb, lw)
+            name = line[1:].split()[0].decode() if line[1:].split() else ""
+            length, offset, lb, lw, irregular = 0, nxt, 0, 0, False
+        elif name is not None:
+            bases = len(line.rstrip(b"\r"))
+            if (irregular and bases) or (lb and bases > lb):
+                raise ValueError("irregular")
+            if lb == 0:
+                lb, lw = bases, nl + 1 - pos
+            elif bases != lb:
+                irregular = True
+            length += bases
+        pos = nxt
+    if name is not None:
+        index[name] = (length, offset, lb, lw)
+    return index
+
+
+@pytest.mark.parametrize("seed", range(200))
+def test_vectorised_index_matches_reference(seed):
+    rng = np.random.default_rng(seed)
+    eol = b"\r\n" if seed % 5 == 0 else b"\n"
+    parts = []
+    for i in range(int(rng.integers(1, 6))):
+        n = int(rng.integers(1, 300))
+        width = int(rng.integers(1, 80))
+        seq = np.array(rng.choice(list(b"ACGTNacgt"), size=n), dtype=np.uint8).tobytes()
+        lines = [seq[j:j + width] for j in range(0, n, width)]
+        body = eol.join(lines) + (eol if rng.random() < 0.9 else b"")
+        if rng.random() < 0.2:
+            body += eol  # trailing blank line
+        parts.append(b">s%d desc\n" % i + body)
+        if not body.endswith(b"\n"):
+            parts[-1] += b"\n"
+    data = b"".join(parts)
+    assert _build_fai(data) == _reference_fai(data)
+
+
+def test_irregular_and_empty_records():
+    with pytest.raises(ValueError):
+        _build_fai(b">a\nACGT\nAC\nACGT\n")
+    with pytest.raises(ValueError):
+        _build_fai(b">a\nAC\nACGT\n")
+    assert _build_fai(b">a\n>b\nAC\n") == {"a": (0, 3, 0, 0), "b": (2, 6, 2, 3)}
+
+
+def test_stale_but_consistent_index_is_reused(tmp_path, monkeypatch):
+    import os
+    from moodspy import genome
+
+    path = tmp_path / "g.fa"
+    write_fasta(path, {"chr1": "ACGT" * 50, "chr2": "GG" * 33})
+    mp.FastaFile(path)
+    st = os.stat(path)
+    os.utime(path, ns=(st.st_atime_ns, st.st_mtime_ns + 10**10))  # FASTA now newer than .fai
+    genome._INDEX_MEMO.clear()
+    monkeypatch.setattr(genome, "_build_fai", lambda mm: pytest.fail("index was rebuilt"))
+    assert mp.FastaFile(path).fetch("chr2", 0, 4) == "GGGG"
+
+
+def test_stale_inconsistent_index_is_rebuilt(tmp_path):
+    import os
+    from moodspy import genome
+
+    path = tmp_path / "g.fa"
+    write_fasta(path, {"chr1": "ACGT" * 50})
+    mp.FastaFile(path)
+    write_fasta(path, {"chr1": "T" * 7, "chrX": "ACGT" * 50}, width=13)
+    st = os.stat(path)
+    os.utime(path, ns=(st.st_atime_ns, st.st_mtime_ns + 10**10))
+    genome._INDEX_MEMO.clear()
+    fa = mp.FastaFile(path)
+    assert fa.lengths == {"chr1": 7, "chrX": 200}
+
+
+def test_read_only_directory_uses_cache(tmp_path, monkeypatch):
+    import os
+    from moodspy import genome
+
+    ro = tmp_path / "ref"
+    ro.mkdir()
+    path = ro / "g.fa"
+    write_fasta(path, {"chr1": "ACGT" * 100})
+    os.chmod(ro, 0o555)
+    try:
+        fa = mp.FastaFile(path)
+        assert not (ro / "g.fa.fai").exists()
+        assert any(p.name.endswith(".fai") for p in __import__("pathlib").Path(genome.cache_dir()).iterdir())
+        genome._INDEX_MEMO.clear()
+        monkeypatch.setattr(genome, "_build_fai", lambda mm: pytest.fail("index was rebuilt"))
+        assert mp.FastaFile(path).index == fa.index
+    finally:
+        os.chmod(ro, 0o755)
+
+
+def test_base_counts_cached_on_disk(tmp_path, monkeypatch):
+    path = tmp_path / "g.fa"
+    write_fasta(path, {"chr1": "AACGTNacgt" * 30, "chr2": "GGGG"})
+    first = mp.FastaFile(path).base_counts()
+    assert first.tolist() == [90, 60, 64, 60]
+    monkeypatch.setattr(mp.FastaFile, "_count_bases", lambda self: pytest.fail("recounted"))
+    np.testing.assert_array_equal(mp.FastaFile(path).base_counts(), first)
+
+
+def test_mixed_line_endings_on_last_line():
+    data = b">a\r\n" + b"ACGTACGTAC\r\n" * 3 + b"ACGTACGTAC\n>b\nAC\n"
+    assert _build_fai(data) == _reference_fai(data)

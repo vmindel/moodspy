@@ -60,7 +60,8 @@ chr2:70000-70500              0              0               0
 ```
 
 The first call writes `toy_genome.fa.fai` next to the FASTA, the same index `samtools
-faidx` builds, and reuses it afterwards. moodspy reads the FASTA through a memory map, so
+faidx` builds, and reuses it afterwards. For a read-only reference directory, the index
+goes to `~/.cache/moodspy` instead, so it is never rebuilt on each call. moodspy reads the FASTA through a memory map, so
 it never loads the whole genome into memory.
 
 The same regions as a BED file give identical results:
@@ -135,8 +136,9 @@ print(best[["seq", "motif", "start", "score"]])
 
 ## Genome background
 
-`bg="genome"` uses the base composition of the whole FASTA. Reading a 3 Gb genome takes a
-while, so compute it once and pass the numbers:
+`bg="genome"` uses the base composition of the whole FASTA. The counts take 1–2 s to compute
+for hg38 and are cached on disk afterwards. You can also compute them yourself and pass them
+explicitly:
 
 ```python
 counts = fa.base_counts()

@@ -17,9 +17,16 @@ avoid re-reading the index on every call.
 - **Compressed FASTA raises.** That includes `.gz` and bgzip. Decompress the
   file, or pass a `pysam.FastaFile` / `pyfaidx.Fasta` object, which can
   read bgzip.
-- If `<fasta>.fai` is missing or older than the FASTA, the index is built
-  by scanning the file once and written next to it. A read-only directory
-  just skips the write.
+- Index lookup order: `<fasta>.fai` is used if it is newer than the FASTA,
+  or if it is older but still consistent with the file. Otherwise the
+  moodspy cache is tried (`$MOODSPY_CACHE_DIR`, default `~/.cache/moodspy`).
+  As a last resort the index is rebuilt (about 0.2 s/Gb, vectorised) and
+  saved next to the FASTA, or to the cache when the reference directory
+  is read-only (shared `/shareDB`, iGenomes and so on). A `UserWarning` is
+  raised only if neither location is writable.
+- `g.base_counts()` and `bg="genome"` read the genome once (about 0.4 s/Gb)
+  and then cache the counts in the same cache directory. Later processes
+  get them instantly.
 - FASTA lines must have equal length within a record, except the last line
   (the samtools rule). Otherwise `ValueError`.
 - Record names are cut at the first whitespace, as in samtools.
@@ -52,9 +59,9 @@ mp.regions_frame(df)                      # normalise any DataFrame / pyranges /
 
 ## Background from the genome
 
-`bg="genome"` counts every A, C, G and T in the FASTA, which is about
-3 Gb for hg38. It reads the whole file on the first call. Compute it once
-and pass the numbers on later calls:
+`bg="genome"` counts every A, C, G and T in the FASTA (about 1–2 s for
+hg38). The counts are cached on disk after the first call. Passing explicit
+numbers is still the most reproducible option:
 
 ```python
 g = mp.FastaFile("hg38.fa")

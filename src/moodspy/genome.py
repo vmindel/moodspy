@@ -9,9 +9,12 @@ if missing). Other genome objects work too: anything with
 
 from __future__ import annotations
 
+import hashlib
+import json
 import mmap
 import os
 import re
+import warnings
 from collections.abc import Iterator
 from typing import Any
 
@@ -27,8 +30,14 @@ class FastaFile:
     Parameters
     ----------
     path
-        FASTA file. ``<path>.fai`` is used if present, otherwise an index
-        is built in memory (and written next to the file when possible).
+        FASTA file. Its samtools index ``<path>.fai`` is used when present.
+        An index older than the FASTA is still used if it is consistent with
+        the file. Otherwise an index is built (about 0.2 s per Gb) and
+        written next to the FASTA, or to the moodspy cache directory
+        (``$MOODSPY_CACHE_DIR``, default ``~/.cache/moodspy``) when that
+        directory is read-only.
+    write_index
+        Save a newly built index (next to the FASTA, else to the cache).
     """
 
     def __init__(self, path: str | os.PathLike, write_index: bool = True):
@@ -39,22 +48,15 @@ class FastaFile:
                 "pyfaidx.Fasta object as the genome"
             )
         self._fh = open(self.path, "rb")
-        self._mm = mmap.mmap(self._fh.fileno(), 0, access=mmap.ACCESS_READ)
-        fai = self.path + ".fai"
-        if os.path.exists(fai) and os.path.getmtime(fai) >= os.path.getmtime(self.path):
-            self.index = _read_fai(fai)
-        else:
-            self.index = _build_fai(self._mm)
-            if write_index:
-                try:
-                    _write_fai(self.index, fai)
-                except OSError:
-                    pass
+        self._mm = mmap.mmap(self._fh.fileno(), 0, access=mmap.ACCESS_READ) if os.path.getsize(self.path) else b""
+        self._key = _file_key(self.path)
+        self.index = _load_index(self.path, self._mm, self._key, write_index)
         self._bg: np.ndarray | None = None
 
     def close(self) -> None:
         if not self._fh.closed:
-            self._mm.close()
+            if isinstance(self._mm, mmap.mmap):
+                self._mm.close()
             self._fh.close()
 
     def __del__(self) -> None:
@@ -95,6 +97,8 @@ class FastaFile:
         end = length if end is None else end
         if start < 0 or end > length or start > end:
             raise ValueError(f"region {chrom}:{start}-{end} is outside 0-{length}")
+        if start == end:
+            return ""
 
         def at(p: int) -> int:
             return offset + (p // line_bases) * line_width + p % line_bases
@@ -108,16 +112,38 @@ class FastaFile:
         return self.fetch(chrom)
 
     def base_counts(self) -> np.ndarray:
-        """Genome-wide A, C, G, T counts (computed once, then cached)."""
+        """Genome-wide A, C, G, T counts (case-insensitive).
+
+        Computed once from the raw file (about 0.4 s per Gb), then cached in
+        memory and in the moodspy cache directory, so later calls and later
+        processes get it instantly.
+        """
         if self._bg is None:
-            counts = np.zeros(INVALID + 1, dtype=np.int64)
-            step = 1 << 26
-            for chrom, (length, *_) in self.index.items():
-                for s in range(0, length, step):
-                    seq = self.fetch(chrom, s, min(s + step, length)).encode("ascii")
-                    counts += np.bincount(_LUT[np.frombuffer(seq, np.uint8)], minlength=INVALID + 1)
-            self._bg = counts[:INVALID].astype(np.float64)
-        return self._bg
+            cached = _cache_read(self._key, "counts.json")
+            if cached is not None:
+                self._bg = np.asarray(json.loads(cached), dtype=np.float64)
+            else:
+                self._bg = self._count_bases()
+                _cache_write(self._key, "counts.json", json.dumps(self._bg.tolist()))
+        return self._bg.copy()
+
+    def _count_bases(self) -> np.ndarray:
+        counts = np.zeros(4, dtype=np.int64)
+        if not self.index:
+            return counts.astype(np.float64)
+        arr = np.frombuffer(self._mm, dtype=np.uint8)
+        try:
+            for length, offset, lb, lw in self.index.values():
+                if length == 0:
+                    continue
+                end = offset + (length // lb) * lw + length % lb
+                for a in range(offset, end, _CHUNK):
+                    folded = arr[a : min(a + _CHUNK, end)] | 0x20  # lower-case
+                    for i, base in enumerate(b"acgt"):
+                        counts[i] += np.count_nonzero(folded == base)
+        finally:
+            del arr
+        return counts.astype(np.float64)
 
 
 def _read_fai(path: str) -> dict[str, tuple[int, int, int, int]]:
@@ -132,40 +158,172 @@ def _read_fai(path: str) -> dict[str, tuple[int, int, int, int]]:
 
 def _write_fai(index: dict, path: str) -> None:
     with open(path, "w") as fh:
-        for name, (length, offset, lb, lw) in index.items():
-            fh.write(f"{name}\t{length}\t{offset}\t{lb}\t{lw}\n")
+        fh.write(_fai_text(index))
 
 
-def _build_fai(mm: mmap.mmap) -> dict[str, tuple[int, int, int, int]]:
+_CHUNK = 1 << 26
+
+
+def _count_byte(arr: np.ndarray, a: int, b: int, value: int) -> int:
+    n = 0
+    for c in range(a, b, _CHUNK):
+        n += int(np.count_nonzero(arr[c : min(c + _CHUNK, b)] == value))
+    return n
+
+
+def _build_fai(mm) -> dict[str, tuple[int, int, int, int]]:
+    """samtools-compatible index of a FASTA held in a buffer (vectorised)."""
+    size = len(mm)
+    heads = [0] if size and mm[:1] == b">" else []
+    pos = 0
+    while True:
+        i = mm.find(b"\n>", pos)
+        if i < 0:
+            break
+        heads.append(i + 1)
+        pos = i + 1
     index: dict[str, tuple[int, int, int, int]] = {}
-    pos, size = 0, len(mm)
-    name = None
-    length = offset = lb = lw = 0
-    irregular = False
-    while pos < size:
-        nl = mm.find(b"\n", pos)
-        nl = size if nl < 0 else nl
-        line = mm[pos:nl]
-        nxt = nl + 1
-        if line.startswith(b">"):
-            if name is not None:
-                index[name] = (length, offset, lb, lw)
-            name = line[1:].split()[0].decode() if line[1:].split() else ""
+    if not heads:
+        return index
+    arr = np.frombuffer(mm, dtype=np.uint8)
+    try:
+        for k, h in enumerate(heads):
+            e = heads[k + 1] if k + 1 < len(heads) else size
+            hdr_end = mm.find(b"\n", h, e)
+            hdr_end = e if hdr_end < 0 else hdr_end
+            words = bytes(mm[h + 1 : hdr_end]).split()
+            name = words[0].decode() if words else ""
             if name in index:
                 raise ValueError(f"duplicate sequence name {name!r} in FASTA")
-            length, offset, lb, lw, irregular = 0, nxt, 0, 0, False
-        elif name is not None:
-            bases = len(line.rstrip(b"\r"))
-            if (irregular and bases) or (lb and bases > lb):
+            s = min(hdr_end + 1, e)
+            n_nl = _count_byte(arr, s, e, 10)
+            n_cr = _count_byte(arr, s, e, 13)
+            length = (e - s) - n_nl - n_cr
+            if length == 0:
+                index[name] = (0, s, 0, 0)
+                continue
+            first_nl = mm.find(b"\n", s, e)
+            first_nl = e if first_nl < 0 else first_nl
+            lw = first_nl + 1 - s
+            lb = len(bytes(mm[s:first_nl]).rstrip(b"\r"))
+            ok = lb > 0
+            if ok:
+                # every line but the last holds exactly lb bases followed by an
+                # (lw - lb)-byte terminator; only \n / \r may follow the last base
+                breaks = (length - 1) // lb
+                last = s + breaks * lw + (length - 1) % lb + 1
+                term = lw - lb
+                ok = last <= e and term in (1, 2)
+            if ok:
+                ends = arr[s + lw - 1 : s + breaks * lw : lw]
+                ok = len(ends) == breaks and bool((ends == 10).all())
+                if ok and term == 2:
+                    ok = bool((arr[s + lw - 2 : s + breaks * lw : lw] == 13).all())
+                if ok:
+                    tail_nl = _count_byte(arr, last, e, 10)
+                    tail_cr = _count_byte(arr, last, e, 13)
+                    ok = n_nl - tail_nl == breaks and n_cr - tail_cr == breaks * (term - 1)
+            if not ok:
                 raise ValueError(f"sequence {name!r} has lines of unequal length; cannot index")
-            if lb == 0:
-                lb, lw = bases, nl + 1 - pos
-            elif bases != lb:
-                irregular = True  # allowed only on the last line
-            length += bases
-        pos = nxt
-    if name is not None:
-        index[name] = (length, offset, lb, lw)
+            index[name] = (length, s, lb, lw)
+    finally:
+        del arr
+    return index
+
+
+def _index_consistent(index: dict, mm) -> bool:
+    """Cheap check that an existing .fai still describes this file."""
+    size = len(mm)
+    for length, offset, lb, lw in index.values():
+        if offset > size or (offset > 0 and mm[offset - 1 : offset] != b"\n"):
+            return False
+        if length:
+            if lb <= 0 or lw < lb:
+                return False
+            end = offset + (length // lb) * lw + length % lb
+            if end > size or (end < size and mm[end : end + 1] not in (b"\n", b"\r", b">")):
+                return False
+    return True
+
+
+def _file_key(path: str) -> str:
+    st = os.stat(path)
+    raw = f"{os.path.realpath(path)}|{st.st_size}|{st.st_mtime_ns}"
+    return hashlib.sha1(raw.encode()).hexdigest()[:20]
+
+
+def cache_dir() -> str:
+    """Directory for moodspy's caches (FASTA indexes, genome base counts)."""
+    env = os.environ.get("MOODSPY_CACHE_DIR")
+    if env:
+        return env
+    base = os.environ.get("XDG_CACHE_HOME") or os.path.join(os.path.expanduser("~"), ".cache")
+    return os.path.join(base, "moodspy")
+
+
+def _cache_read(key: str, suffix: str) -> str | None:
+    try:
+        with open(os.path.join(cache_dir(), f"{key}.{suffix}")) as fh:
+            return fh.read()
+    except OSError:
+        return None
+
+
+def _cache_write(key: str, suffix: str, text: str) -> bool:
+    try:
+        os.makedirs(cache_dir(), exist_ok=True)
+        tmp = os.path.join(cache_dir(), f"{key}.{suffix}.{os.getpid()}.tmp")
+        with open(tmp, "w") as fh:
+            fh.write(text)
+        os.replace(tmp, os.path.join(cache_dir(), f"{key}.{suffix}"))
+        return True
+    except OSError:
+        return False
+
+
+def _fai_text(index: dict) -> str:
+    return "".join(f"{n}\t{a}\t{b}\t{c}\t{d}\n" for n, (a, b, c, d) in index.items())
+
+
+def _parse_fai(text: str) -> dict[str, tuple[int, int, int, int]]:
+    index = {}
+    for line in text.splitlines():
+        if line.strip():
+            name, length, offset, lb, lw = line.split("\t")[:5]
+            index[name] = (int(length), int(offset), int(lb), int(lw))
+    return index
+
+
+_INDEX_MEMO: dict[str, dict] = {}
+
+
+def _load_index(path: str, mm, key: str, write: bool) -> dict:
+    if key in _INDEX_MEMO:
+        return _INDEX_MEMO[key]
+    fai = path + ".fai"
+    index = None
+    if os.path.exists(fai):
+        index = _read_fai(fai)
+        if os.path.getmtime(fai) < os.path.getmtime(path) and not _index_consistent(index, mm):
+            index = None
+    if index is None:
+        cached = _cache_read(key, "fai")
+        if cached is not None:
+            index = _parse_fai(cached)
+    if index is None:
+        index = _build_fai(mm)
+        if write:
+            try:
+                _write_fai(index, fai)
+            except OSError:
+                if not _cache_write(key, "fai", _fai_text(index)):
+                    warnings.warn(
+                        f"could not save the index of {path} (directory and {cache_dir()} are not "
+                        "writable); it will be rebuilt in every new process. Set MOODSPY_CACHE_DIR "
+                        "to a writable directory.",
+                        stacklevel=3,
+                    )
+    _INDEX_MEMO[key] = index
     return index
 
 

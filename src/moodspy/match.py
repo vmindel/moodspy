@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import warnings
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -113,7 +114,7 @@ def match_motifs(
     Parameters
     ----------
     motifs
-        A :class:`~moodspy.Motif`, a list of them, a ``{label: matrix}``
+        A [`Motif`][moodspy.Motif], a list of them, a ``{label: matrix}``
         mapping, Biopython / pyjaspar motifs, or a path to a motif file
         (JASPAR, MEME, HOMER, TRANSFAC). Count matrices are converted to
         log-odds with ``pseudocount`` as in TFBSTools' ``toPWM``.
@@ -127,7 +128,7 @@ def match_motifs(
           a pyranges object, a list of ``"chr:start-end"`` strings, or an
           AnnData whose ``var_names`` (or ``obs_names``) are such strings.
     genome
-        FASTA path, :class:`~moodspy.FastaFile`, ``pysam.FastaFile``,
+        FASTA path, [`FastaFile`][moodspy.FastaFile], ``pysam.FastaFile``,
         ``pyfaidx.Fasta`` or ``{chrom: sequence}`` dict. Needed for genomic
         regions and for ``bg="genome"``.
     bg
@@ -141,13 +142,13 @@ def match_motifs(
     p_cutoff
         P-value cutoff for calling a hit.
     w
-        Lookup window size; affects speed only.
+        Lookup window size. Affects speed, not which hits are found.
     pseudocount
         Pseudocount added to count / probability matrices.
     motifmatchr_compat
         Reproduce motifmatchr bit for bit, including its inverted
         background correction of the score matrix (see
-        :meth:`Motif.log_odds`). Results only differ from the default when
+        [`Motif.log_odds`][moodspy.Motif.log_odds]). Results only differ from the default when
         the background is not uniform.
     n_jobs
         Number of threads (default: all cores).
@@ -242,6 +243,11 @@ def _load_subject(subject: Any, genome: Any) -> tuple[list[str], pd.DataFrame]:
         else:
             return _load_regions(regions_frame(path), genome)
     if isinstance(subject, str):
+        if re.search(r"[/\\.]", subject):
+            raise FileNotFoundError(
+                f"{subject!r} is not an existing file (strings are only scanned as DNA "
+                "when they contain no '/', '\\' or '.')"
+            )
         return [subject], pd.DataFrame(index=pd.Index(["seq0"], name="seq"))
     if _is_anndata(subject):
         names = subject.var_names if _looks_like_regions(subject.var_names) else subject.obs_names
@@ -254,7 +260,8 @@ def _load_subject(subject: Any, genome: Any) -> tuple[list[str], pd.DataFrame]:
     if isinstance(subject, pd.Series):
         return [str(s) for s in subject], pd.DataFrame(index=subject.index.astype(str).rename("seq"))
     seqs = list(subject)
-    if seqs and genome is not None and _looks_like_regions(seqs):
+    if seqs and _looks_like_regions(seqs):
+        # region strings without a genome raise in _load_regions
         return _load_regions(regions_frame(seqs), genome)
     seqs = [str(s) for s in seqs]
     return seqs, pd.DataFrame(index=pd.Index([f"seq{i}" for i in range(len(seqs))], name="seq"))

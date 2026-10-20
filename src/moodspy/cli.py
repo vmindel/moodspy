@@ -37,7 +37,7 @@ def build_parser() -> argparse.ArgumentParser:
         default="positions",
         help="positions: one row per hit; others: sequences x motifs table",
     )
-    s.add_argument("-w", "--window", type=int, default=7, help="lookup window size (speed only)")
+    s.add_argument("-w", "--window", type=int, default=7, help="lookup window size (affects speed, not the hits)")
     s.add_argument("--pseudocount", type=float, default=0.8)
     s.add_argument("--motifmatchr-compat", action="store_true",
                    help="reproduce motifmatchr scores exactly (inverted background correction)")

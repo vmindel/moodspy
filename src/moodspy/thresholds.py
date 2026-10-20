@@ -129,7 +129,7 @@ def thresholds_from_p(
     precision: float = DEFAULT_PRECISION,
     n_jobs: int | None = 1,
 ) -> np.ndarray:
-    """Vectorised :func:`threshold_from_p` over many matrices (multithreaded)."""
+    """Vectorised [`threshold_from_p`][moodspy.threshold_from_p] over many matrices (multithreaded)."""
     bg = np.full(4, 0.25) if background is None else check_background(background)
     _check_p(p)
     mats = [np.ascontiguousarray(np.asarray(m, dtype=np.float64).T) for m in pwms]

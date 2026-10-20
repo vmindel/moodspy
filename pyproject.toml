@@ -28,9 +28,11 @@ dependencies = [
 [project.optional-dependencies]
 anndata = ["anndata>=0.9"]
 test = ["pytest>=7", "anndata>=0.9"]
+docs = ["mkdocs>=1.6,<2", "mkdocs-material>=9.5", "mkdocstrings[python]>=0.26", "ruff", "anndata>=0.9"]
 
 [project.scripts]
 moodspy = "moodspy.cli:main"
+moodspy-install-skills = "moodspy._skills.install:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/moodspy"]

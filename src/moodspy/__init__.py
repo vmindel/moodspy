@@ -2,6 +2,7 @@
 
 from importlib.metadata import PackageNotFoundError, version
 
+from .datasets import example_motifs
 from .genome import FastaFile, read_bed, read_fasta, regions_frame
 from .io import (
     parse_homer,
@@ -29,6 +30,7 @@ __all__ = [
     "MotifMatches",
     "Scanner",
     "check_background",
+    "example_motifs",
     "match_motifs",
     "parse_homer",
     "parse_jaspar",

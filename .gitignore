@@ -7,3 +7,5 @@ dist/
 *.fai
 benchmarks/bench_motifs.jaspar
 benchmarks/bench_seqs.fa
+site/
+.claude/

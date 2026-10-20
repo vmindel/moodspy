@@ -43,7 +43,7 @@ class Motif:
         infer it the way motifmatchr's ``pwmType`` does.
     nsites
         Number of aligned sites behind a probability matrix; used to scale
-        the pseudocount. Defaults to :data:`DEFAULT_NSITES`.
+        the pseudocount. Defaults to `DEFAULT_NSITES`.
     log_base
         Logarithm base of a log-odds matrix.
     background
@@ -169,7 +169,7 @@ class Motif:
     ) -> np.ndarray:
         """Log-odds score matrix ``log(p / background)`` (default uniform).
 
-        Counts and probabilities are smoothed with :meth:`probabilities`.
+        Counts and probabilities are smoothed with [`probabilities`][moodspy.Motif.probabilities].
         Log-odds input is re-centred on the new background and rescaled to
         ``log_base``.
 
@@ -279,7 +279,7 @@ def check_background(bg: Any) -> np.ndarray:
 
 
 def as_motif(obj: Any, name: str | None = None) -> Motif:
-    """Coerce a Motif, Biopython motif or raw matrix into a :class:`Motif`."""
+    """Coerce a Motif, Biopython motif or raw matrix into a [`Motif`][moodspy.Motif]."""
     if isinstance(obj, Motif):
         return obj
     if hasattr(obj, "counts") and hasattr(obj, "alphabet"):  # Bio.motifs.Motif
@@ -288,7 +288,7 @@ def as_motif(obj: Any, name: str | None = None) -> Motif:
 
 
 def as_motif_list(motifs: Any) -> list[Motif]:
-    """Coerce motif input into a list of :class:`Motif`.
+    """Coerce motif input into a list of [`Motif`][moodspy.Motif].
 
     Accepts a single Motif / matrix, an iterable of them, a mapping of
     label -> matrix/Motif, or a path to a motif file.

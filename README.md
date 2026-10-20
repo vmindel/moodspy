@@ -27,6 +27,37 @@ pip install -e ".[test]"    # + pytest and anndata
 Dependencies: numpy, scipy, pandas, numba. `anndata` is optional (for `.to_anndata()` and
 AnnData input).
 
+### Claude Code skill
+
+moodspy ships an [Agent Skill](https://docs.claude.com/en/docs/claude-code/skills) for
+[Claude Code](https://claude.com/claude-code) that teaches the agent to use the library
+correctly. It covers the API contracts and the defaults that silently change results:
+
+- `bg="subject"` makes results depend on which sequences are scanned together.
+- Absent sparse entries are "no hit", not a score of 0.
+- Categorical columns need `observed=True` in pandas `groupby`.
+- Coordinates are 0-based, while motifmatchr's are 1-based.
+- `motifmatchr_compat` controls whether scores reproduce motifmatchr.
+
+It also covers common workflows (peaks + genome, scATAC/AnnData, whole-genome scans,
+porting from motifmatchr or MOODS-python). The skill is bundled with the package. Claude
+Code doesn't scan installed Python packages, so install it once into your personal skills
+directory:
+
+```bash
+moodspy-install-skills
+```
+
+This copies the skill to `~/.claude/skills/moodspy/`, where Claude Code can use it in every
+project. To install it into a single project instead, run
+`moodspy-install-skills --dest .claude/skills/moodspy`. After upgrading moodspy, re-run with
+`--force`.
+
+The skill is a short router (`SKILL.md`) that points to topic files under `references/`,
+which are read on demand. It costs almost no context until it's used. It also includes
+`scripts/check_hits.py`, which checks a scan independently by brute force.
+`moodspy-install-skills --print-path` shows where the bundled copy lives.
+
 ## Quick start
 
 ```python
@@ -175,7 +206,8 @@ for either kind of input, so this cost doesn't apply.
 
 The first call in a fresh environment also compiles the numba kernels, which takes a few
 seconds. The compiled code is cached on disk after that. For very large inputs, `w=8` or
-`w=9` trades a slightly slower setup for faster scanning. The results never depend on `w`.
+`w=9` trades a slightly slower setup for faster scanning. `w` never changes which hits are found. Scores can differ in the last floating-point digit
+(~1e-15), because the columns are summed in a different order.
 
 ## How it works
 
@@ -193,9 +225,14 @@ seconds. The compiled code is cached on disk after that. For very large inputs, 
 
 ## Development
 
+Documentation (tutorials and API reference) is built with mkdocs-material and
+mkdocstrings. Every tutorial code block with output is executed and checked by `pytest`.
+
 ```bash
-pip install -e ".[test]"
+pip install -e ".[test,docs]"
 pytest
+mkdocs serve                       # docs preview at http://127.0.0.1:8000
+python docs/run_docs.py --update   # refresh tutorial outputs after an intentional change
 # regenerate the motifmatchr fixtures (needs R + motifmatchr):
 cd tests/data && python make_inputs.py && Rscript make_motifmatchr_fixtures.R
 ```

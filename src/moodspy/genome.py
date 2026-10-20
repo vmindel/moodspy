@@ -1,6 +1,6 @@
 """Genome access: indexed FASTA reading and region extraction.
 
-:class:`FastaFile` is a small, dependency-free, memory-mapped reader for
+[`FastaFile`][moodspy.FastaFile] is a small, dependency-free, memory-mapped reader for
 uncompressed FASTA files with a samtools ``.fai`` index (built on the fly
 if missing). Other genome objects work too: anything with
 ``fetch(chrom, start, end)`` (pysam.FastaFile), ``genome[chrom][start:end]``
@@ -53,8 +53,15 @@ class FastaFile:
         self._bg: np.ndarray | None = None
 
     def close(self) -> None:
-        self._mm.close()
-        self._fh.close()
+        if not self._fh.closed:
+            self._mm.close()
+            self._fh.close()
+
+    def __del__(self) -> None:
+        try:
+            self.close()
+        except Exception:
+            pass
 
     def __enter__(self) -> FastaFile:
         return self
@@ -175,12 +182,15 @@ class _Genome:
         g = self.obj
         if isinstance(g, FastaFile):
             return g.fetch(chrom, start, end)
+        if start < 0 or start > end:
+            raise ValueError(f"invalid region {chrom}:{start}-{end}")
         if hasattr(g, "fetch"):  # pysam.FastaFile
-            return g.fetch(chrom, start, end)
-        seq = g[chrom]
-        if start < 0 or end > len(seq):
-            raise ValueError(f"region {chrom}:{start}-{end} is outside 0-{len(seq)}")
-        return str(seq[start:end])
+            seq = g.fetch(chrom, start, end)
+        else:
+            seq = str(g[chrom][start:end])
+        if len(seq) != end - start:  # pysam / pyfaidx / dict slicing truncate silently
+            raise ValueError(f"region {chrom}:{start}-{end} runs past the end of {chrom}")
+        return seq
 
     def fetch_many(self, chroms, starts, ends) -> list[str]:
         return [self.fetch(c, int(s), int(e)) for c, s, e in zip(chroms, starts, ends)]
@@ -265,9 +275,12 @@ def region_names(df: pd.DataFrame) -> pd.Index:
 
 def read_bed(path: str | os.PathLike) -> pd.DataFrame:
     """Read the first 3 (and name, if present) columns of a BED file."""
+    import gzip
+
     rows = []
     names = []
-    with open(path) as fh:
+    opener = gzip.open if os.fspath(path).endswith(".gz") else open
+    with opener(path, "rt") as fh:
         for line in fh:
             if not line.strip() or line.startswith(("#", "track", "browser")):
                 continue

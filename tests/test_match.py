@@ -131,3 +131,10 @@ def test_errors(motifs, genome):
         mp.match_motifs(motifs, ["ACGT"], out="bogus")
     with pytest.raises(ValueError):
         mp.match_motifs(motifs, [])
+
+
+def test_string_inputs_fail_loudly(motifs):
+    with pytest.raises(FileNotFoundError):
+        mp.match_motifs(motifs, "peaks_typo.bed")
+    with pytest.raises(ValueError, match="genome"):
+        mp.match_motifs(motifs, ["chr1:100-200", "chr2:5-50"])

@@ -1,0 +1,79 @@
+site_name: moodspy
+site_description: Fast PWM motif matching for Python, a modern rewrite of MOODS with a motifmatchr-style API
+site_url: https://vmindel.github.io/moodspy/
+repo_url: https://github.com/vmindel/moodspy
+repo_name: vmindel/moodspy
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - content.code.copy
+    - search.suggest
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+nav:
+  - Home: index.md
+  - Installation: installation.md
+  - Tutorials:
+      - Quick start: tutorials/quickstart.md
+      - Peaks and genomes: tutorials/peaks-and-genomes.md
+      - Single-cell ATAC: tutorials/single-cell-atac.md
+      - Working with motifs: tutorials/motifs.md
+      - Scanners and performance: tutorials/scanner.md
+      - Coming from motifmatchr: tutorials/from-motifmatchr.md
+  - Claude Code skill: claude-skill.md
+  - API reference:
+      - match_motifs: api/match.md
+      - Motif: api/motifs.md
+      - Scanner: api/scanner.md
+      - Thresholds: api/thresholds.md
+      - Motif files: api/io.md
+      - Genomes and regions: api/genome.md
+      - Command line: api/cli.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: numpy
+            show_root_heading: true
+            show_source: false
+            show_signature_annotations: true
+            separate_signature: true
+            members_order: source
+            merge_init_into_class: true
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+
+exclude_docs: |
+  run_docs.py

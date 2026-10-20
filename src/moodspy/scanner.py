@@ -31,7 +31,7 @@ class Scanner:
 
     Building a scanner computes thresholds and lookup tables once; it can
     then be reused on any number of sequence sets. Most users should call
-    :func:`moodspy.match_motifs`, which wraps this class.
+    [`moodspy.match_motifs`][moodspy.match_motifs], which wraps this class.
 
     Parameters
     ----------
@@ -45,15 +45,16 @@ class Scanner:
     thresholds
         Explicit score thresholds (one per motif); overrides ``p_cutoff``.
     w
-        Window size of the lookup table (``4**w`` entries). Only affects
-        speed and memory, never the result.
+        Window size of the lookup table (``4**w`` entries). Affects speed
+        and memory, never which hits are found (scores may differ by ~1e-15
+        because columns are summed in a different order).
     pseudocount
         Pseudocount for count / probability matrices.
     log_base
         Base of the log-odds scores reported (2, as in motifmatchr).
     motifmatchr_compat
         Score matrices exactly as motifmatchr does, including its inverted
-        background correction (see :meth:`Motif.log_odds`). Only useful to
+        background correction (see [`Motif.log_odds`][moodspy.Motif.log_odds]). Only useful to
         reproduce motifmatchr results.
     n_jobs
         Threads to use (``None`` or ``-1`` for all cores).

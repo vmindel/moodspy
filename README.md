@@ -154,13 +154,24 @@ than `ACGTacgt` (N, IUPAC codes) never match. Scores are log2 odds.
 ## Performance
 
 These are timings on an Apple M4 Pro (12 cores) for 20,000 sequences × 500 bp and 200 motifs
-at p = 5e-5, using `benchmarks/`. They include threshold computation and table building.
+at p = 5e-5, using `benchmarks/`. All of them include threshold computation and table
+building. Both tools find the same 284,536 hits (moodspy finds 172 more, the short-motif
+end-of-sequence hits described above).
 
-| task                  | motifmatchr 1.30 | moodspy, 1 thread | moodspy, 12 threads |
-|-----------------------|-----------------:|------------------:|--------------------:|
-| `out="matches"`       | 3.3 s            | 2.8 s             | 0.45 s              |
-| `out="scores"`        | 3.3 s            | 2.8 s             | 0.45 s              |
-| `out="positions"`     | 473 s for only 2,000 seqs | 2.9 s    | 0.5 s               |
+| task                               | motifmatchr 1.30 | moodspy, 1 thread | moodspy, 12 threads |
+|------------------------------------|-----------------:|------------------:|--------------------:|
+| `out="matches"`                    | 3.3 s            | 2.8 s             | 0.45 s              |
+| `out="scores"`                     | 3.3 s            | 2.8 s             | 0.45 s              |
+| `out="positions"`, genomic ranges  | 4.0 s            | 2.9 s             | 0.5 s               |
+
+Single-threaded, the two are close, since both run the same MOODS algorithm. Most of
+moodspy's gain comes from multithreading.
+
+Avoid motifmatchr's `positions` output on plain sequences (a character vector or
+`DNAStringSet`). It builds a separate `IRanges` object for every (motif, sequence) pair,
+about 1 ms each, so it took 94 s for 400 sequences and 200 motifs. The scan itself, which
+is MOODS' C++ code, takes 3.2 s for all 20,000 sequences. moodspy returns one DataFrame
+for either kind of input, so this cost doesn't apply.
 
 The first call in a fresh environment also compiles the numba kernels, which takes a few
 seconds. The compiled code is cached on disk after that. For very large inputs, `w=8` or

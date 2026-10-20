@@ -27,12 +27,11 @@ adata = ad.AnnData(
     X=sp.random(300, len(peaks), density=0.05, format="csr", random_state=0, dtype=np.float32),
     var=pd.DataFrame(index=peaks),
 )
-print(adata)
+print(adata.shape, adata.var_names[:3].tolist())
 ```
 
 ```text
-AnnData object with n_obs × n_vars = 300 × 390
-    layers: None (.X)
+(300, 390) ['chr1:0-500', 'chr1:1000-1500', 'chr1:2000-2500']
 ```
 
 ## Peak x motif annotation
@@ -45,15 +44,12 @@ assert res.shape[0] == adata.n_vars
 
 adata.varm["motif_match"] = res.matches
 adata.uns["motif_names"] = list(res.motifs.index)
-print(adata)
+print(adata.varm["motif_match"].shape, adata.uns["motif_names"])
 ```
 
 ```text
 MotifMatches(390 sequences x 3 motifs; assays: matches, scores, counts; p_cutoff=5e-05)
-AnnData object with n_obs × n_vars = 300 × 390
-    uns: 'motif_names'
-    varm: 'motif_match'
-    layers: None (.X)
+(390, 3) ['MA0599.1_KLF5', 'MA0107.1_RELA', 'MA0137.3_STAT1']
 ```
 
 `bg="genome"` keeps the annotation independent of which peaks are in the object. With
@@ -93,16 +89,18 @@ as `var`, and scores and counts as layers:
 
 ```python
 mad = res.to_anndata()
-print(mad)
+print(mad.shape, sorted(k for k in mad.layers.keys() if k))
+print(mad.obs.head(3))
 print(mad.var)
 ```
 
 ```text
-AnnData object with n_obs × n_vars = 390 × 3
-    obs: 'chrom', 'start', 'end'
-    var: 'id', 'name', 'length', 'threshold'
-    uns: 'motif_matching'
-    layers: 'scores', 'counts', None (.X)
+(390, 3) ['counts', 'scores']
+               chrom  start   end
+seq
+chr1:0-500      chr1      0   500
+chr1:1000-1500  chr1   1000  1500
+chr1:2000-2500  chr1   2000  2500
                       id   name  length  threshold
 motif
 MA0599.1_KLF5   MA0599.1   KLF5      10    11.1730

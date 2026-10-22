@@ -17,6 +17,11 @@ package [motifmatchr](https://github.com/GreenleafLab/motifmatchr).
   seamlessly overlapping pieces.
 * **motifmatchr semantics.** It returns the same matches, best scores, hit counts and positions
   (verified against motifmatchr 1.30; see [Differences](#differences-from-motifmatchr--moods)).
+* **universalmotif's motif and sequence tools.** Information content, IUPAC consensus,
+  trimming, motif comparison (12 metrics, plus Tomtom-style p-values), merging, clustering,
+  sequence logos, k-let shuffling, random sequences, masking and motif implanting, ported
+  from [universalmotif](https://github.com/bjmt/universalmotif) and checked against it
+  (see [Motif and sequence tools](#motif-and-sequence-tools)).
 * **Python-native I/O.** It reads JASPAR, MEME, HOMER and TRANSFAC motifs, takes sequences
   as strings, dicts or FASTA files, takes regions as pandas DataFrames, BED files,
   pyranges objects or AnnData peak names, and writes results as SciPy sparse matrices,
@@ -26,11 +31,12 @@ package [motifmatchr](https://github.com/GreenleafLab/motifmatchr).
 
 ```bash
 pip install -e .            # from this directory
-pip install -e ".[test]"    # + pytest and anndata
+pip install -e ".[plot]"    # + matplotlib, for sequence logos
+pip install -e ".[test]"    # + pytest, anndata and matplotlib
 ```
 
 Dependencies: numpy, scipy, pandas, numba. `anndata` is optional (for `.to_anndata()` and
-AnnData input).
+AnnData input), and so is `matplotlib` (for `moodspy.plotting`).
 
 ### Claude Code skill
 
@@ -150,6 +156,38 @@ counts, best = sc.summarize(list_of_seqs) # sparse (n_seqs, n_motifs)
 moodspy scan -m motifs.jaspar -r peaks.bed -g hg38.fa -p 5e-5 -o hits.tsv
 moodspy scan -m motifs.meme -s seqs.fa --out counts --bg 0.25,0.25,0.25,0.25 -o counts.tsv
 ```
+
+## Motif and sequence tools
+
+A port of the R/Bioconductor package [universalmotif](https://github.com/bjmt/universalmotif)
+for everything around the scan:
+
+```python
+motifs = mp.read_motifs("JASPAR2024_CORE_vertebrates_non-redundant_pfms_jaspar.txt")
+
+mp.motif_table(motifs)                          # length, total / mean IC, IUPAC consensus
+mp.trim_motifs(motifs, min_ic=0.25)             # cut uninformative edges
+mp.compare_motifs(motifs, method="PCC")         # all vs all; 12 metrics, 7 score strategies
+mp.compare_motifs_lite(denovo, targets=motifs)  # Tomtom-style p / q-values for annotation
+mp.merge_similar(motifs, threshold=0.95)        # cluster and merge a redundant database
+tree = mp.motif_tree(motifs, method="PCC")      # SciPy linkage; tree.clusters(), tree.plot()
+
+from moodspy.plotting import plot_logo, view_motifs
+plot_logo(motifs[0]); view_motifs(motifs[:5])   # logos, aligned and stacked
+
+mp.get_bkg(seqs, k=[1, 2, 3], meme_file="bg.txt")      # k-let frequencies, MEME background
+control = mp.shuffle_sequences(seqs, k=2)              # exact dinucleotide-preserving shuffle
+fake = mp.create_sequences(1000, 500, mp.get_bkg(seqs, k=2))
+pos, truth = mp.implant_motifs(motifs[:3], fake, n_per_seq=1, centre_bias=4)
+mp.mask_ranges(seqs, hits)                      # blank out known sites before rescanning
+```
+
+Scores, p-values, merged motifs, clusters and backgrounds match universalmotif 1.31 to
+1e-6 (`tests/test_universalmotif_parity.py`, fixtures from
+`tests/data/make_universalmotif_fixtures.R`). These functions use universalmotif's
+pseudocount of 1 for count matrices; scanning keeps TFBSTools' 0.8. The
+[tutorial](https://vmindel.github.io/moodspy/tutorials/motif-tools/) lists the functions
+side by side with their R names and the few deliberate differences.
 
 ## From motifmatchr
 

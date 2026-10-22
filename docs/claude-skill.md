@@ -42,6 +42,7 @@ almost no context until it's used.
 | `references/motifs-io.md` | matrix kinds, pseudocounts, labels, file formats |
 | `references/thresholds-background.md` | `p_cutoff`, `bg=`, negative thresholds, compat mode |
 | `references/scanner-performance.md` | `Scanner` reuse, threads, `w`, whole-genome scans |
+| `references/motif-tools.md` | universalmotif port: comparing, merging, clustering, logos, shuffling, simulating |
 | `references/from-motifmatchr.md` | porting R motifmatchr and MOODS-python code |
 | `scripts/check_hits.py` | brute-force check of a scan on a sample of sequences |
 

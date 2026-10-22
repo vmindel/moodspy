@@ -1,5 +1,5 @@
 site_name: moodspy
-site_description: Fast PWM motif matching for Python, a modern rewrite of MOODS with a motifmatchr-style API
+site_description: Fast PWM motif matching for Python, a modern rewrite of MOODS with a motifmatchr-style API, plus universalmotif's motif and sequence tools
 site_url: https://vmindel.github.io/moodspy/
 repo_url: https://github.com/vmindel/moodspy
 repo_name: vmindel/moodspy
@@ -35,6 +35,7 @@ nav:
       - Peaks and genomes: tutorials/peaks-and-genomes.md
       - Single-cell ATAC: tutorials/single-cell-atac.md
       - Working with motifs: tutorials/motifs.md
+      - Motif and sequence tools: tutorials/motif-tools.md
       - Scanners and performance: tutorials/scanner.md
       - Coming from motifmatchr: tutorials/from-motifmatchr.md
   - Claude Code skill: claude-skill.md
@@ -45,6 +46,10 @@ nav:
       - Thresholds: api/thresholds.md
       - Motif files: api/io.md
       - Genomes and regions: api/genome.md
+      - Motif manipulation: api/manipulate.md
+      - Comparing and clustering: api/compare.md
+      - Sequence tools: api/sequences.md
+      - Logos: api/plotting.md
       - Command line: api/cli.md
 
 plugins:

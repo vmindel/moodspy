@@ -18,6 +18,39 @@ from .io import (
 from .match import MotifMatches, match_motifs
 from .motifs import Motif, check_background
 from .scanner import Scanner
+from .compare import (
+    MotifAlignment,
+    MotifTree,
+    align_motifs,
+    compare_motifs,
+    compare_motifs_lite,
+    merge_motifs,
+    merge_similar,
+    motif_tree,
+)
+from .manipulate import (
+    average_ic,
+    create_motif,
+    icm,
+    iupac_consensus,
+    motif_ic,
+    motif_table,
+    round_motif,
+    sample_sites,
+    score_match,
+    shuffle_motifs,
+    trim_motifs,
+)
+from .sequences import (
+    create_sequences,
+    get_bkg,
+    implant_motifs,
+    mask_ranges,
+    mask_seqs,
+    revcomp,
+    shuffle_sequences,
+    write_fasta,
+)
 from .thresholds import threshold_from_p, thresholds_from_p
 
 try:

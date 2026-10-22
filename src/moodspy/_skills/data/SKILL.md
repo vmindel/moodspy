@@ -1,6 +1,6 @@
 ---
 name: moodspy
-description: Use for any task involving the moodspy library — PWM / transcription-factor motif matching in Python (a rewrite of MOODS with a motifmatchr-style API). Triggers on scanning sequences, peaks, BED files or a genome FASTA for motif hits; motif x peak match/count/score matrices for chromVAR-style or scATAC analysis; motif hit positions; p-value score thresholds; reading or writing JASPAR, MEME, HOMER or TRANSFAC motifs; background nucleotide frequencies; porting R motifmatchr or MOODS-python code. This is a router skill — read the relevant file under references/ for details and footguns before writing moodspy code.
+description: Use for any task involving the moodspy library — PWM / transcription-factor motif matching in Python (a rewrite of MOODS with a motifmatchr-style API, plus a port of universalmotif). Triggers on scanning sequences, peaks, BED files or a genome FASTA for motif hits; motif x peak matrices for chromVAR-style or scATAC analysis; hit positions; p-value thresholds; reading or writing JASPAR, MEME, HOMER or TRANSFAC motifs; backgrounds; comparing, merging, clustering, trimming or plotting motifs (logos, Tomtom-style matching against a database); k-mer backgrounds, shuffled or simulated sequences, implanting motifs; porting R motifmatchr, universalmotif or MOODS-python code. This is a router skill — read the relevant file under references/ before writing moodspy code.
 ---
 
 # moodspy
@@ -23,6 +23,7 @@ columns in pandas groupby.
 | **motifs**: building `Motif`, counts vs probabilities vs log-odds, pseudocounts, labels, file formats | `references/motifs-io.md` |
 | **thresholds and background**: `p_cutoff`, `bg=`, `threshold_from_p`, negative thresholds, `motifmatchr_compat` | `references/thresholds-background.md` |
 | **reusing a `Scanner`**, threads, `w`, memory, numba compile time, batching a genome | `references/scanner-performance.md` |
+| **motif and sequence tools** (universalmotif port): IC, consensus, trimming, `compare_motifs` / `compare_motifs_lite`, merging, clustering, logos, `get_bkg`, shuffling, simulated sequences, implanting, masking | `references/motif-tools.md` |
 | **porting R motifmatchr / MOODS-python** code or comparing against their results | `references/from-motifmatchr.md` |
 | "**are these hits correct?**": independent brute-force check of a scan | `scripts/check_hits.py` |
 

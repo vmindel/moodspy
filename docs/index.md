@@ -28,6 +28,10 @@ res.to_anndata()
 - **Python-native I/O.** It reads JASPAR, MEME, HOMER and TRANSFAC motifs, takes regions
   as DataFrames, BED, pyranges or AnnData, and returns SciPy sparse matrices, pandas or
   AnnData.
+- **universalmotif's motif and sequence tools.** Information content, consensus,
+  trimming, motif comparison with Tomtom-style p-values, merging, clustering, logos,
+  k-let shuffling, random sequences and motif implanting, matching universalmotif 1.31
+  ([tutorial](tutorials/motif-tools.md)).
 - **A [Claude Code skill](claude-skill.md)** ships with the package.
 
 ## Where next
@@ -38,6 +42,7 @@ res.to_anndata()
 | [Peaks and genomes](tutorials/peaks-and-genomes.md) | BED / DataFrame regions with a FASTA genome |
 | [Single-cell ATAC](tutorials/single-cell-atac.md) | AnnData peaks, `varm` annotation, per-cell counts |
 | [Working with motifs](tutorials/motifs.md) | motif kinds, pseudocounts, thresholds, file formats |
+| [Motif and sequence tools](tutorials/motif-tools.md) | compare, merge, cluster, plot logos; shuffle, simulate, mask sequences |
 | [Scanners and performance](tutorials/scanner.md) | reusing a scanner, threads, whole genomes |
 | [Coming from motifmatchr](tutorials/from-motifmatchr.md) | translation table and differences |
 | [API reference](api/match.md) | every public function and class |

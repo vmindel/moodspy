@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "moodspy"
 version = "0.1.0"
-description = "Fast PWM motif matching for Python: a modern rewrite of MOODS with a motifmatchr-style API"
+description = "Fast PWM motif matching and motif manipulation for Python: MOODS with a motifmatchr-style API, plus a port of universalmotif"
 readme = "README.md"
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
@@ -27,8 +27,9 @@ dependencies = [
 
 [project.optional-dependencies]
 anndata = ["anndata>=0.9"]
-test = ["pytest>=7", "anndata>=0.9"]
-docs = ["mkdocs>=1.6,<2", "mkdocs-material>=9.5", "mkdocstrings[python]>=0.26", "ruff", "anndata>=0.9"]
+plot = ["matplotlib>=3.6"]
+test = ["pytest>=7", "anndata>=0.9", "matplotlib>=3.6"]
+docs = ["mkdocs>=1.6,<2", "mkdocs-material>=9.5", "mkdocstrings[python]>=0.26", "ruff", "anndata>=0.9", "matplotlib>=3.6"]
 
 [project.scripts]
 moodspy = "moodspy.cli:main"

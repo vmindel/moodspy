@@ -140,7 +140,10 @@ def match_motifs(
         ``"scores"``: matches plus best score and hit count per sequence.
         ``"positions"``: a DataFrame with one row per hit.
     p_cutoff
-        P-value cutoff for calling a hit.
+        P-value cutoff for calling a hit, in (0, 1]. ``p_cutoff=1`` keeps every
+        placement, so ``out="scores"`` gives each sequence's best score over
+        all placements and strands, and ``counts`` becomes the number of
+        placements scored.
     w
         Lookup window size. Affects speed, not which hits are found.
     pseudocount

@@ -108,7 +108,9 @@ def threshold_from_p(
     pwm
         ``(4, length)`` log-odds score matrix (rows A, C, G, T).
     p
-        Upper-tail probability under the background model.
+        Upper-tail probability under the background model, in (0, 1].
+        ``p=1`` disables the threshold (it is set 1 below the matrix's lowest
+        possible score, as in MOODS), so every placement is a hit.
     background
         Nucleotide frequencies the p-value refers to (default uniform).
     precision
@@ -119,7 +121,7 @@ def threshold_from_p(
         raise ValueError("pwm must be a (4, length) matrix")
     bg = np.full(4, 0.25) if background is None else check_background(background)
     _check_p(p)
-    return float(_threshold_kernel(mat, bg, float(p), float(precision)))
+    return float(_threshold(mat, bg, float(p), float(precision)))
 
 
 def thresholds_from_p(
@@ -135,7 +137,7 @@ def thresholds_from_p(
     mats = [np.ascontiguousarray(np.asarray(m, dtype=np.float64).T) for m in pwms]
 
     def one(m):
-        return _threshold_kernel(m, bg, float(p), float(precision))
+        return _threshold(m, bg, float(p), float(precision))
 
     if n_jobs == 1 or len(mats) < 2:
         return np.array([one(m) for m in mats], dtype=np.float64)
@@ -143,6 +145,14 @@ def thresholds_from_p(
         return np.array(list(pool.map(one, mats)), dtype=np.float64)
 
 
+def _threshold(mat: np.ndarray, bg: np.ndarray, p: float, precision: float) -> float:
+    if p >= 1.0:
+        # No cutoff. The DP would compare a total mass of ~1 against p and could
+        # drop the worst word to rounding error, so handle it exactly.
+        return float(mat.min(axis=1).sum()) - 1.0
+    return _threshold_kernel(mat, bg, p, precision)
+
+
 def _check_p(p: float) -> None:
-    if not 0.0 < p < 1.0:
-        raise ValueError(f"p-value cutoff must be in (0, 1), got {p}")
+    if not 0.0 < p <= 1.0:
+        raise ValueError(f"p-value cutoff must be in (0, 1], got {p}")

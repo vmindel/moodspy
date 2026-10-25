@@ -61,3 +61,24 @@ def test_thresholds_match_motifmatchr():
 def test_bad_p():
     with pytest.raises(ValueError):
         mp.threshold_from_p(np.zeros((4, 3)), 0)
+    assert mp.threshold_from_p(np.full((4, 3), -1.0), 1) == -4.0
+
+
+def test_p_cutoff_one_scores_every_placement(rng):
+    motifs = mp.example_motifs()
+    seqs = ["".join(rng.choice(list("ACGT"), size=int(n))) for n in rng.integers(11, 40, 30)]
+    res = mp.match_motifs(motifs, seqs, bg="even", out="scores", p_cutoff=1)
+    for j, m in enumerate(motifs):
+        pwm = m.log_odds()
+        assert res.motifs.threshold.iat[j] == pytest.approx(pwm.min(axis=0).sum() - 1)
+        for i, s in enumerate(seqs):
+            n = len(s) - m.length + 1
+            assert res.counts[i, j] == (2 * n if n > 0 else 0)
+            if n > 0:
+                codes = mp._alphabet.encode(s)
+                idx = np.arange(n)[:, None] + np.arange(m.length)
+                best = max(pwm[codes[idx], np.arange(m.length)].sum(1).max(),
+                           pwm[::-1, ::-1][codes[idx], np.arange(m.length)].sum(1).max())
+                assert res.scores[i, j] == pytest.approx(best)
+    with pytest.raises(ValueError):
+        mp.match_motifs(motifs, seqs, p_cutoff=1.5)

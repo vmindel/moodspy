@@ -19,6 +19,13 @@ the lowest grid score whose upper tail is ≤ p. A hit is `score >= threshold`.
 - If even the single best word has probability > p, the threshold is
   `max_score - min_delta / 2`, so only the best word passes. If p is near 1,
   almost everything passes.
+- **`p_cutoff=1` disables the threshold.** It is set 1 below the lowest
+  possible score, so every placement is a hit. Use it with `out="scores"` to
+  get each sequence's best score over all placements and strands, e.g. for
+  short windows around known sites. `counts` then equals
+  `2 × (len - motif_len + 1)` for N-free sequences. Avoid
+  `out="positions"` with it on long inputs, since it returns every
+  placement.
 - The pwm passed to `threshold_from_p` must already be log-odds against the
   same `background`. Pass `m.log_odds(bg)` with `background=bg`, not raw
   counts.

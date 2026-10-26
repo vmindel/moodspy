@@ -25,7 +25,7 @@ res.to_anndata()
 - **Same answers as motifmatchr.** With `motifmatchr_compat=True` it agrees exactly with
   motifmatchr 1.30, and by default it fixes two upstream bugs
   ([details](tutorials/from-motifmatchr.md)).
-- **Python-native I/O.** It reads JASPAR, MEME, HOMER and TRANSFAC motifs, takes regions
+- **Python-native I/O.** It reads JASPAR, MEME, HOMER, HOCOMOCO and TRANSFAC motifs, takes regions
   as DataFrames, BED, pyranges or AnnData, and returns SciPy sparse matrices, pandas or
   AnnData.
 - **universalmotif's motif and sequence tools.** Information content, consensus,

@@ -22,7 +22,7 @@ package [motifmatchr](https://github.com/GreenleafLab/motifmatchr).
   sequence logos, k-let shuffling, random sequences, masking and motif implanting, ported
   from [universalmotif](https://github.com/bjmt/universalmotif) and checked against it
   (see [Motif and sequence tools](#motif-and-sequence-tools)).
-* **Python-native I/O.** It reads JASPAR, MEME, HOMER and TRANSFAC motifs, takes sequences
+* **Python-native I/O.** It reads JASPAR, MEME, HOMER, HOCOMOCO and TRANSFAC motifs, takes sequences
   as strings, dicts or FASTA files, takes regions as pandas DataFrames, BED files,
   pyranges objects or AnnData peak names, and writes results as SciPy sparse matrices,
   pandas or AnnData.

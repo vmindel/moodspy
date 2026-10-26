@@ -90,7 +90,7 @@ for 1e-3 and 1e-4 sits between the best and second-best scores.
 
 ## Motif files
 
-`read_motifs` detects JASPAR, raw `.pfm`, MEME, HOMER and TRANSFAC from the file contents:
+`read_motifs` detects JASPAR, raw `.pfm`, MEME, HOMER, HOCOMOCO and TRANSFAC from the file contents:
 
 ```python
 mp.write_meme(mp.example_motifs(), "example.meme")
@@ -119,6 +119,14 @@ Motif('MA0599.1_KLF5', length=10, kind='probability', consensus='GCCCCGCCCC') 13
 
 MEME and HOMER files hold probabilities. The pseudocount is scaled by `nsites`, which
 defaults to 20 when the file doesn't give it.
+
+HOCOMOCO's per-motif `.pcm`, `.pfm` and `.pwm` files are read as counts, probabilities and
+log-odds respectively. HOCOMOCO PWMs are natural-log scores against a uniform background, so
+they come in with `log_base=e` and are rescaled to log2 for scanning:
+
+```py
+(foxb1,) = mp.read_motifs("FOXB1.H14CORE.0.SM.B.pwm")
+```
 
 Downloads from [JASPAR](https://jaspar.elixir.no/downloads/) in "JASPAR" format, e.g.
 `JASPAR2024_CORE_vertebrates_non-redundant_pfms_jaspar.txt`, can be read directly:

@@ -33,6 +33,19 @@ HOMER = """>CACGTG\tbHLH(CACGTG)/Homer\t7.5\t-1.0e-10\t0
 0.0 0.0 0.0 1.0
 """
 
+# HOCOMOCO v14 layout: >ID, then one A C G T row per position
+HOCOMOCO_PWM = """>FOXB1.H14CORE.0.SM.B
+0.8225739623327950	0.2233944032444520	-1.4492775391962918	-1.4329875901921556
+-6.7056837627930941	-2.9480242014292228	-6.3341348497024166	1.3723369487936381
+1.3005699668287771	-6.7056837627930941	-1.1203565269982128	-6.7056837627930941
+-6.7056837627930941	-6.7056837627930941	-6.7056837627930941	1.3853759878921224
+"""
+
+HOCOMOCO_PCM = """>FOXB1.H14CORE.0.SM.B
+120	30	0	50
+0	1	0	199
+"""
+
 TRANSFAC = """AC  M00001
 XX
 ID  V$MYOD_01
@@ -80,6 +93,21 @@ def test_homer():
     assert b.consensus == "T"
 
 
+def test_hocomoco():
+    (m,) = mp.parse_hocomoco(HOCOMOCO_PWM)
+    assert m.id == "FOXB1.H14CORE.0.SM.B" and m.name == ""
+    assert m.kind == "log-odds" and m.log_base == np.e and m.length == 4
+    assert m.consensus.upper() == "ATAT"
+    # natural-log scores against a uniform background
+    np.testing.assert_allclose(m.log_odds(log_base=np.e), m.matrix)
+    np.testing.assert_allclose(m.probabilities().sum(axis=0), 1.0)
+    (c,) = mp.parse_hocomoco(HOCOMOCO_PCM)
+    assert c.kind == "counts"
+    np.testing.assert_array_equal(c.matrix[:, 0], [120, 30, 0, 50])
+    with pytest.raises(ValueError, match="4 values"):
+        mp.parse_hocomoco(">x\n1 2 3\n")
+
+
 def test_transfac():
     a, b = mp.parse_transfac(TRANSFAC)
     assert a.id == "M00001" and a.name == "MyoD" and a.length == 2
@@ -92,6 +120,15 @@ def test_sniffing(tmp_path):
         p = tmp_path / f"motifs.{fmt}.txt"
         p.write_text(text)
         assert len(mp.read_motifs(p)) == 2
+    for text, ext in ((HOCOMOCO_PWM, "pwm"), (HOCOMOCO_PCM, "pcm")):
+        p = tmp_path / f"FOXB1.H14CORE.0.SM.B.{ext}"
+        p.write_text(text)
+        (m,) = mp.read_motifs(p)
+        assert m.label == "FOXB1.H14CORE.0.SM.B"
+    raw = tmp_path / "MA0004.1.pfm"
+    raw.write_text(">MA0004.1 Arnt\n4 19 0\n16 0 20\n0 1 0\n0 0 0\n")
+    (m,) = mp.read_motifs(raw)
+    assert m.label == "MA0004.1_Arnt" and m.kind == "counts" and m.length == 3
     pfm = tmp_path / "MA0001.pfm"
     pfm.write_text("1 2 3\n0 0 0\n4 4 4\n1 1 1\n")
     (m,) = mp.read_motifs(pfm)

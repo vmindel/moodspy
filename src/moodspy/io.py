@@ -2,7 +2,7 @@
 
 Supported formats: JASPAR (``.jaspar``, bracketed or plain), raw JASPAR
 PFM (``.pfm``, 4 rows of counts), MEME (minimal and full text output),
-HOMER (``.motif``) and TRANSFAC.
+HOMER (``.motif``), HOCOMOCO (``.pcm``/``.pfm``/``.pwm``) and TRANSFAC.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ import numpy as np
 
 from .motifs import Motif
 
-MotifFormat = Literal["jaspar", "pfm", "meme", "homer", "transfac"]
+MotifFormat = Literal["jaspar", "pfm", "meme", "homer", "hocomoco", "transfac"]
 
 _FLOAT = re.compile(r"[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?")
 
@@ -31,6 +31,7 @@ def read_motifs(path: str | os.PathLike, format: MotifFormat | None = None) -> l
         "pfm": parse_pfm,
         "meme": parse_meme,
         "homer": parse_homer,
+        "hocomoco": parse_hocomoco,
         "transfac": parse_transfac,
     }[fmt]
     motifs = parser(text)
@@ -50,10 +51,18 @@ def _sniff(text: str, path: str) -> MotifFormat:
     if re.search(r"^(P0|PO)\s", head, re.M) or re.search(r"^ID\s", head, re.M) and "//" in text:
         return "transfac"
     if head.startswith(">"):
-        body = head.splitlines()[1:3]
-        if any("[" in line or re.match(r"\s*[ACGT]\s", line) for line in body):
+        lines = head.splitlines()
+        body = lines[1:3]
+        if ext == ".jaspar" or any("[" in line or re.match(r"\s*[ACGT]\s", line) for line in body):
             return "jaspar"
-        return "homer" if ext != ".jaspar" else "jaspar"
+        widths = [len(_FLOAT.findall(ln)) for ln in body if ln.strip() and not ln.startswith(">")]
+        if widths and widths[0] != 4:
+            # >ID name, then 4 rows of L values: JASPAR's "raw PFM" download
+            return "jaspar"
+        if len(lines[0].split()) == 1:
+            # HOMER headers carry consensus, name and threshold; HOCOMOCO only the ID
+            return "hocomoco"
+        return "homer"
     return "pfm"
 
 
@@ -184,6 +193,31 @@ def parse_homer(text: str) -> list[Motif]:
             except ValueError:
                 pass
         motifs.append(Motif.from_probabilities(np.array(rows).T, name=name, id=None, meta=meta))
+    return motifs
+
+
+# ---------------------------------------------------------------------- HOCOMOCO
+def parse_hocomoco(text: str) -> list[Motif]:
+    """Parse HOCOMOCO ``.pcm``, ``.pfm`` and ``.pwm`` files.
+
+    Each record is a ``>ID`` line followed by one row of A, C, G, T values
+    per position. The kind (counts, probability or log-odds) is inferred from
+    the values; log-odds are taken as natural-log scores against a uniform
+    background, which is how HOCOMOCO computes its PWMs.
+    """
+    motifs = []
+    for block in re.split(r"^>", text, flags=re.M):
+        lines = [ln for ln in block.strip().splitlines() if ln.strip()]
+        if len(lines) < 2:
+            continue
+        header = lines[0].split(None, 1)
+        mid = header[0] if header else None
+        name = header[1].strip() if len(header) > 1 else ""
+        rows = [[float(x) for x in _FLOAT.findall(ln)] for ln in lines[1:]]
+        if any(len(r) != 4 for r in rows):
+            raise ValueError(f"HOCOMOCO motif {mid!r}: every row must hold 4 values (A, C, G, T)")
+        mat = np.array(rows).T
+        motifs.append(Motif(mat, name=name, id=mid, log_base=np.e))
     return motifs
 
 

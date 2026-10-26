@@ -23,4 +23,6 @@ These take the text of a file and return a list of [`Motif`][moodspy.Motif].
 
 ::: moodspy.parse_homer
 
+::: moodspy.parse_hocomoco
+
 ::: moodspy.parse_transfac

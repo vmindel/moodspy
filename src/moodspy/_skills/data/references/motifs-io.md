@@ -51,15 +51,16 @@ otherwise whichever exists, otherwise `motif_<i>`.
 mp.read_motifs(path, format=None)         # list[Motif]; format sniffed from content/extension
 mp.write_jaspar(motifs, path)             # probabilities written as counts x nsites (or 100)
 mp.write_meme(motifs, path, background=None)
-mp.parse_jaspar(text) / parse_pfm / parse_meme / parse_homer / parse_transfac
+mp.parse_jaspar(text) / parse_pfm / parse_meme / parse_homer / parse_hocomoco / parse_transfac
 ```
 
 | format | id / name taken from | matrix kind |
 |---|---|---|
 | JASPAR (`>MA0599.1 KLF5` + `A [ ... ]` rows, brackets optional) | header words 1 / rest | counts |
-| raw `.pfm` (4 numeric rows, no header) | file stem as id | counts |
+| raw `.pfm` (4 numeric rows, optional `>ID name` header) | file stem as id | counts |
 | MEME (`MOTIF id alt`, letter-probability matrix) | `id` / `alt`; `nsites=` kept | probability |
 | HOMER (`>consensus<TAB>name<TAB>threshold`) | name (no id); threshold in `m.meta["homer_threshold"]` | probability |
+| HOCOMOCO `.pcm`/`.pfm`/`.pwm` (`>ID` + one A C G T row per position) | header / none | auto; log-odds are natural log, uniform background |
 | TRANSFAC (`AC`/`ID`, `NA`, `P0` table, `//`) | first AC or ID / NA | auto |
 
 - MEME files must use the ACGT alphabet. RNA and protein files raise.

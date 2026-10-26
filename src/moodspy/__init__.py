@@ -6,6 +6,7 @@ from .datasets import example_motifs
 from .genome import FastaFile, read_bed, read_fasta, regions_frame
 from .hits import remove_overlaps
 from .io import (
+    parse_hocomoco,
     parse_homer,
     parse_jaspar,
     parse_meme,
@@ -66,6 +67,7 @@ __all__ = [
     "check_background",
     "example_motifs",
     "match_motifs",
+    "parse_hocomoco",
     "parse_homer",
     "parse_jaspar",
     "parse_meme",

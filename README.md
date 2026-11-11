@@ -250,8 +250,8 @@ is MOODS' C++ code, takes 3.2 s for all 20,000 sequences. moodspy returns one Da
 for either kind of input, so this cost doesn't apply.
 
 The first call in a fresh environment also compiles the numba kernels, which takes a few
-seconds. The compiled code is cached on disk after that. For very large inputs, `w=8` or
-`w=9` trades a slightly slower setup for faster scanning. `w` never changes which hits are found. Scores can differ in the last floating-point digit
+seconds. The compiled code is cached on disk after that. The lookup window `w` is chosen
+automatically from the amount of sequence (7 for small inputs, 9 or 10 for large ones). `w` never changes which hits are found. Scores can differ in the last floating-point digit
 (~1e-15), because the columns are summed in a different order.
 
 ## How it works

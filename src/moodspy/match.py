@@ -100,7 +100,7 @@ def match_motifs(
     bg: BackgroundSpec | Sequence[float] | Mapping[str, float] = "subject",
     out: Output = "matches",
     p_cutoff: float = 5e-5,
-    w: int = 7,
+    w: int | None = None,
     pseudocount: float = DEFAULT_PSEUDOCOUNT,
     motifmatchr_compat: bool = False,
     n_jobs: int | None = None,
@@ -145,7 +145,9 @@ def match_motifs(
         all placements and strands, and ``counts`` becomes the number of
         placements scored.
     w
-        Lookup window size. Affects speed, not which hits are found.
+        Lookup window size (1 to 12). Affects speed and memory, not which
+        hits are found. Default: chosen from the amount of sequence (see
+        [`Scanner`][moodspy.Scanner]), or 7 with ``motifmatchr_compat``.
     pseudocount
         Pseudocount added to count / probability matrices.
     motifmatchr_compat
@@ -169,6 +171,8 @@ def match_motifs(
     if len(seqs) == 0:
         raise ValueError("no sequences to scan")
     background = _resolve_bg(bg, seqs, genome)
+    if w is None and motifmatchr_compat:
+        w = 7  # motifmatchr's window, so scores keep its summation order
     scanner = Scanner(
         motifs,
         background,

@@ -21,7 +21,7 @@ for batch in batches:
 ```
 
 ```text
-Scanner(3 motifs, p_cutoff=0.0001, w=7) [10.838  9.902  9.188]
+Scanner(3 motifs, p_cutoff=0.0001, w=auto) [10.838  9.902  9.188]
 [[14 21 19]]
 [[15 23 22]]
 [[25 11 11]]
@@ -99,8 +99,10 @@ for w in (4, 9):
 9 True True
 ```
 
-The default `w=7` (as in motifmatchr) suits typical inputs. `w=8` or `w=9` is faster for
-100k+ peaks or whole genomes.
+By default `w` is chosen for each call from the amount of sequence: 7 (as in motifmatchr)
+below 1 Mb, 9 below 100 Mb and 10 above, reduced if the lookup table would exceed 256 MB.
+A table is built the first time its window size is needed and then kept, so a reused
+`Scanner` pays for it once. Pass `w=` to fix it.
 
 ## Timings
 
@@ -123,7 +125,7 @@ number about `2 × length × p_cutoff` per motif, roughly 60k per motif on hg38 
 ```py
 g = mp.FastaFile("hg38.fa")
 counts = g.base_counts()
-sc = mp.Scanner(motifs, counts / counts.sum(), p_cutoff=1e-5, w=8)
+sc = mp.Scanner(motifs, counts / counts.sum(), p_cutoff=1e-5)
 for chrom in g.keys():
     hits = sc.scan([g.fetch(chrom)])
     hits["chrom"] = chrom

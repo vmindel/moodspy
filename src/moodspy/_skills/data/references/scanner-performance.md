@@ -3,7 +3,7 @@
 ```python
 sc = mp.Scanner(
     motifs, background=None,       # None -> UNIFORM, unlike match_motifs' bg="subject"
-    p_cutoff=5e-5, *, thresholds=None, w=7, pseudocount=0.8, log_base=2.0,
+    p_cutoff=5e-5, *, thresholds=None, w=None, pseudocount=0.8, log_base=2.0,
     precision=2000.0, motifmatchr_compat=False, n_jobs=None,
 )
 sc.thresholds, sc.labels, sc.pwms, sc.background
@@ -12,7 +12,7 @@ counts, best = sc.summarize(seqs)  # two CSR (n_seqs, n_motifs): int32 counts, f
 ```
 
 `match_motifs` builds a new Scanner on every call: thresholds plus a
-`4**w` lookup table, about 1 s for 800 motifs. Build one yourself when
+`4**w` lookup table, about 0.5 s for 800 motifs (mostly thresholds). Build one yourself when
 scanning many batches with the same motifs and background.
 
 - `Scanner.scan` returns `seq` as the **integer position** in `seqs`, not a
@@ -32,9 +32,12 @@ scanning many batches with the same motifs and background.
 - **`w`** (1–12) changes speed and memory, never **which hits** are found.
   Scores may differ by ~1e-15 because the summation order changes, so
   compare positions exactly and scores with a tolerance. The
-  table holds `4**w` entries times candidate motifs. w=7 suits small
-  inputs. w=8–9 scan faster on large inputs (100k+ peaks or whole genomes)
-  at a higher setup cost. w ≥ 10 rarely pays off.
+  table holds `4**w` entries times candidate motifs. The default
+  `w=None` picks it per call from the total sequence length: 7 below
+  1 Mb, 9 below 100 Mb, 10 above, reduced if the table would exceed
+  256 MB. Tables are built on first use and cached on the Scanner. Set
+  `w` only to pin memory or to compare runs. `match_motifs` uses 7 when
+  `motifmatchr_compat=True`.
 - **First call compiles** the numba kernels, which takes a few seconds. They
   are cached in `__pycache__` next to the installed package, or in a
   user-wide cache directory when that is read-only. `NUMBA_CACHE_DIR`
@@ -48,7 +51,7 @@ scanning many batches with the same motifs and background.
 ```python
 g = mp.FastaFile("hg38.fa")
 counts = g.base_counts(); bg = counts / counts.sum()
-sc = mp.Scanner(motifs, bg, p_cutoff=1e-5, w=8)
+sc = mp.Scanner(motifs, bg, p_cutoff=1e-5)
 for chrom in ["chr1", "chr2"]:                    # one chromosome at a time bounds memory
     hits = sc.scan([g.fetch(chrom)])
     hits["chrom"] = chrom

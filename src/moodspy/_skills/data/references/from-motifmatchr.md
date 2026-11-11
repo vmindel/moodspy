@@ -34,7 +34,7 @@ precision.
 With `bg="even"` the flag makes no difference. One real difference remains
 in both modes:
 
-- **Edge hits.** For motifs **shorter than `w`** (default 7), MOODS and
+- **Edge hits.** For motifs **shorter than `w`** (7 in motifmatchr), MOODS and
   therefore motifmatchr miss hits that end exactly at the end of a sequence
   or right before an `N`. moodspy reports them, so moodspy counts can be
   higher by those hits. Motifs ≥ 7 bp (nearly all of JASPAR) are

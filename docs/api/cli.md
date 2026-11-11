@@ -18,7 +18,7 @@ usage: moodspy scan [-h] -m MOTIFS (-s SEQUENCES | -r REGIONS) [-g GENOME]
 | `-p, --p-cutoff` | p-value cutoff (default `5e-5`) |
 | `--bg` | `subject`, `genome`, `even` or `A,C,G,T` frequencies |
 | `--out` | `positions` (one row per hit, default) or a `matches` / `counts` / `scores` table (sequences × motifs) |
-| `-w, --window` | lookup window size (affects speed, not the hits) |
+| `-w, --window` | lookup window size, 1-12 (affects speed, not the hits; default: automatic) |
 | `--pseudocount` | pseudocount for count matrices (default 0.8) |
 | `--motifmatchr-compat` | reproduce motifmatchr scores exactly |
 | `-j, --jobs` | threads (default: all cores) |

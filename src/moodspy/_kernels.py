@@ -21,19 +21,131 @@ import numpy as np
 
 
 @numba.njit(nogil=True, cache=True)
-def valid_runs(codes, offsets):
-    """``run[i]`` = number of consecutive ACGT characters starting at ``i``,
-    not crossing the end of the sequence that contains ``i``."""
-    run = np.zeros(codes.shape[0], dtype=np.int64)
+def valid_runs(codes, offsets, run):
+    """Fill ``run[i]`` with the number of consecutive ACGT characters starting
+    at ``i``, not crossing the end of the sequence that contains ``i``.
+
+    Counts saturate at the largest value ``run``'s dtype can hold, so a small
+    dtype is enough as long as it can represent the longest motif.
+    """
+    cap = np.iinfo(run.dtype).max
     for s in range(offsets.shape[0] - 1):
         nxt = 0
         for i in range(offsets[s + 1] - 1, offsets[s] - 1, -1):
             if codes[i] < 4:
-                nxt += 1
+                if nxt < cap:
+                    nxt += 1
             else:
                 nxt = 0
             run[i] = nxt
     return run
+
+
+@numba.njit(nogil=True, cache=True)
+def window_candidates(k_lo, k_hi, w, mat_flat, mat_off, mat_len, wp, thr, la0, store):
+    """Lookup-table entries of matrices ``k_lo .. k_hi - 1``.
+
+    For each matrix, every ``w``-mer code whose window score plus the best
+    score of the remaining columns (``la0``) reaches the threshold. The codes
+    are enumerated depth first, most significant base first, and a prefix is
+    abandoned once even the best completion falls short, so the cost follows
+    the number of entries rather than ``4**w``. Entries come out ordered by
+    matrix, then code. Window scores are summed left to right.
+
+    Returns ``(code, matrix, window score, number of entries)``. With
+    ``store=False`` the entries are only counted and the arrays are empty.
+    """
+    cap = 4096
+    o_code = np.empty(cap, dtype=np.int64)
+    o_mat = np.empty(cap, dtype=np.int32)
+    o_score = np.empty(cap, dtype=np.float64)
+    n = 0
+    digit = np.zeros(w + 1, dtype=np.int64)
+    prefix = np.zeros(w + 1)
+    sufmax = np.zeros(w + 1)
+    for k in range(k_lo, k_hi):
+        mw = min(mat_len[k], w)
+        if mw == 0:
+            continue
+        base = mat_off[k] + wp[k] * 4
+        free = 2 * (w - mw)
+        n_free = 1 << free
+        scale = max(1.0, abs(thr[k]), abs(la0[k]))
+        sufmax[mw] = 0.0
+        for d in range(mw - 1, -1, -1):
+            mx = mat_flat[base + d * 4]
+            for c in range(4):
+                v = mat_flat[base + d * 4 + c]
+                mx = max(mx, v)
+                scale = max(scale, abs(v) * mw)
+            sufmax[d] = sufmax[d + 1] + mx
+        # pruning bound, loosened so rounding can never drop a real entry
+        limit = thr[k] - la0[k] - 1e-9 * scale
+        depth = 0
+        digit[0] = 0
+        prefix[0] = 0.0
+        while depth >= 0:
+            c = digit[depth]
+            if c == 4:
+                depth -= 1
+                if depth >= 0:
+                    digit[depth] += 1
+                continue
+            s = prefix[depth] + mat_flat[base + depth * 4 + c]
+            if depth == mw - 1:
+                if s + la0[k] >= thr[k]:
+                    hi = 0
+                    for t in range(mw):
+                        hi = (hi << 2) | digit[t]
+                    hi <<= free
+                    if not store:
+                        n += n_free
+                        digit[depth] += 1
+                        continue
+                    if n + n_free > cap:
+                        while n + n_free > cap:
+                            cap *= 2
+                        o_code = _grow_i64(o_code, cap)
+                        o_mat = _grow_i32(o_mat, cap)
+                        o_score = _grow_f64(o_score, cap)
+                    for low in range(n_free):
+                        o_code[n] = hi | low
+                        o_mat[n] = k
+                        o_score[n] = s
+                        n += 1
+                digit[depth] += 1
+            elif s + sufmax[depth + 1] < limit:
+                digit[depth] += 1
+            else:
+                prefix[depth + 1] = s
+                depth += 1
+                digit[depth] = 0
+    if not store:
+        return o_code[:0].copy(), o_mat[:0].copy(), o_score[:0].copy(), n
+    return o_code[:n].copy(), o_mat[:n].copy(), o_score[:n].copy(), n
+
+
+@numba.njit(nogil=True, cache=True)
+def bucket_table(n_codes, code, mat, score):
+    """Stable counting sort of table entries by code.
+
+    Returns ``(ptr, mat, score)``; the entries of code ``c`` are
+    ``ptr[c] .. ptr[c + 1] - 1``, in their input order.
+    """
+    ptr = np.zeros(n_codes + 1, dtype=np.int64)
+    for i in range(code.shape[0]):
+        ptr[code[i] + 1] += 1
+    for c in range(n_codes):
+        ptr[c + 1] += ptr[c]
+    fill = ptr[:n_codes].copy()
+    s_mat = np.empty(mat.shape[0], dtype=np.int32)
+    s_score = np.empty(score.shape[0], dtype=np.float64)
+    for i in range(code.shape[0]):
+        j = fill[code[i]]
+        fill[code[i]] = j + 1
+        s_mat[j] = mat[i]
+        s_score[j] = score[i]
+    return ptr, s_mat, s_score
 
 
 @numba.njit(nogil=True, cache=True, inline="always")

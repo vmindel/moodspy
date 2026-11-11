@@ -7,7 +7,7 @@ res = mp.match_motifs(
     genome=None,       # FASTA path, mp.FastaFile, pysam.FastaFile, pyfaidx.Fasta or {chrom: str}; needed for regions
     bg="subject",      # "subject" | "genome" | "even" | 4 floats (A, C, G, T) | {"A": .., ...}
     out="matches",     # "matches" | "scores" | "positions"
-    p_cutoff=5e-5, w=7, pseudocount=0.8, motifmatchr_compat=False, n_jobs=None,
+    p_cutoff=5e-5, w=None, pseudocount=0.8, motifmatchr_compat=False, n_jobs=None,
 )
 ```
 

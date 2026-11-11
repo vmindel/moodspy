@@ -71,3 +71,61 @@ def test_palindrome_hits_both_strands():
 def test_invalid_window():
     with pytest.raises(ValueError):
         mp.Scanner([np.ones((4, 3))], w=13)
+
+
+def test_auto_window_matches_fixed(rng, monkeypatch):
+    from moodspy import scanner as scanner_mod
+
+    motifs = [rng.integers(0, 30, size=(4, n)).astype(float) for n in (3, 6, 9, 12, 16)]
+    seqs = random_seqs(rng, 60, max_len=400)
+    ref = mp.Scanner(motifs, p_cutoff=1e-3, w=7).scan(seqs)
+    cols = ["seq", "motif", "start", "end", "strand"]
+    monkeypatch.setattr(scanner_mod, "AUTO_W_TIERS", ((1000, 5), (None, 9)))
+    sc = mp.Scanner(motifs, p_cutoff=1e-3)
+    assert "w=auto" in repr(sc) and not sc._table_cache
+    small, large = sc.scan(seqs[:1]), sc.scan(seqs)
+    assert sorted(sc._table_cache) == [5, 9]
+    assert large[cols].equals(ref[cols])
+    assert np.allclose(large["score"], ref["score"], rtol=0, atol=1e-10)
+    assert small[cols].equals(ref[ref["seq"] == 0][cols].reset_index(drop=True))
+    counts, _ = sc.summarize(seqs)
+    assert counts.sum() == len(ref)
+
+
+def test_auto_window_respects_table_budget(rng, monkeypatch):
+    from moodspy import scanner as scanner_mod
+
+    motifs = [rng.integers(0, 30, size=(4, 12)).astype(float) for _ in range(3)]
+    monkeypatch.setattr(scanner_mod, "AUTO_W_TIERS", ((None, 10),))
+    sc = mp.Scanner(motifs, p_cutoff=1e-4)
+    assert sc._pick_w(10**6) == 10
+    monkeypatch.setattr(scanner_mod, "AUTO_TABLE_BYTES", 8 * 4**8)
+    assert mp.Scanner(motifs, p_cutoff=1e-4)._pick_w(10**6) == 7
+
+
+def test_table_entries_match_enumeration(rng):
+    # the pruned depth-first build must list exactly the codes a full enumeration finds
+    motifs = [rng.normal(size=(4, n)) * 3 for n in (2, 5, 6, 11)]
+    w = 5
+    sc = mp.Scanner([mp.Motif.from_log_odds(m) for m in motifs], thresholds=[0.5, 2.0, -1e9, 4.0], w=w)
+    _, ptr, tab_mat, tab_score, flat, off, length, wp, _full, thr, la_off, _order, la_bound = sc._table(w)
+    got = {(c, int(tab_mat[e])): tab_score[e] for c in range(4**w) for e in range(ptr[c], ptr[c + 1])}
+    expected = {}
+    for k in range(len(length)):
+        mat = flat[off[k] : off[k + 1]].reshape(-1, 4)
+        ahead = la_bound[la_off[k]] if la_off[k + 1] > la_off[k] else 0.0
+        for c in range(4**w):
+            score = 0.0
+            for i in range(min(length[k], w)):
+                score = score + mat[wp[k] + i, (c >> (2 * (w - 1 - i))) & 3]
+            if score + ahead >= thr[k]:
+                expected[(c, k)] = score
+    assert got == expected and len(got) > 4**w
+
+
+def test_motif_longer_than_255(rng):
+    motif = rng.integers(1, 30, size=(4, 300)).astype(float)
+    sc = mp.Scanner([motif], thresholds=[-1e9], n_jobs=1)
+    seq = "".join(rng.choice(list("ACGT"), size=700))
+    assert len(sc.scan([seq])) == 2 * (700 - 300 + 1)
+    assert len(sc.scan([seq[:350] + "N" + seq[351:]])) == 2 * (51 + 50)

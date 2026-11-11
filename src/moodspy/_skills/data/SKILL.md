@@ -34,7 +34,7 @@ random sample of sequences by brute force and compares the hits with
 ## Conventions
 
 - `import moodspy as mp`. The one entry point is
-  `mp.match_motifs(motifs, subject, genome=None, *, bg="subject", out="matches", p_cutoff=5e-5, w=7, pseudocount=0.8, motifmatchr_compat=False, n_jobs=None)`.
+  `mp.match_motifs(motifs, subject, genome=None, *, bg="subject", out="matches", p_cutoff=5e-5, w=None, pseudocount=0.8, motifmatchr_compat=False, n_jobs=None)`.
   Everything after `genome` is keyword-only.
 - Coordinates are **0-based, half-open** (BED / Python slicing) everywhere,
   in input regions and output positions. motifmatchr is 1-based and closed.

@@ -41,6 +41,7 @@ nav:
   - Claude Code skill: claude-skill.md
   - API reference:
       - match_motifs: api/match.md
+      - Score tracks: api/tracks.md
       - Motif: api/motifs.md
       - Scanner: api/scanner.md
       - Thresholds: api/thresholds.md

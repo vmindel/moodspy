@@ -9,6 +9,7 @@ sc = mp.Scanner(
 sc.thresholds, sc.labels, sc.pwms, sc.background
 hits = sc.scan(seqs)               # DataFrame: seq (INT index), motif, start, end, strand, score
 counts, best = sc.summarize(seqs)  # two CSR (n_seqs, n_motifs): int32 counts, float64 best score
+tracks = sc.tracks(seqs)           # every placement, no threshold; see references/score-tracks.md
 ```
 
 `match_motifs` builds a new Scanner on every call: thresholds plus a

@@ -150,11 +150,28 @@ hits = sc.scan(list_of_seqs)              # DataFrame of all hits
 counts, best = sc.summarize(list_of_seqs) # sparse (n_seqs, n_motifs)
 ```
 
+### Score tracks along peaks
+
+To plot a motif's affinity along a peak instead of its discrete hits, score every
+placement (1 bp step, no threshold):
+
+```python
+tr = mp.motif_tracks(motifs, peaks, genome="hg38.fa", select=["CTCF", "KLF5"])
+tr.columns             # motif, seq, chrom, start, end, strand, score, pvalue
+mp.write_bedgraph(tr, "tracks.{motif}.bedgraph", value="neglog10p")   # IGV / plotgardener
+```
+
+`pvalue` comes from the same null distribution as the thresholds, so
+`tr[tr.pvalue <= 5e-5]` are exactly the hits `match_motifs` reports with the same
+background. `strand="best"` (default) keeps the better strand per placement;
+`strand="both"` keeps both.
+
 ### Command line
 
 ```bash
 moodspy scan -m motifs.jaspar -r peaks.bed -g hg38.fa -p 5e-5 -o hits.tsv
 moodspy scan -m motifs.meme -s seqs.fa --out counts --bg 0.25,0.25,0.25,0.25 -o counts.tsv
+moodspy track -m motifs.jaspar -r peaks.bed -g hg38.fa --select CTCF --bedgraph -o 'tracks.{motif}.bedgraph'
 ```
 
 ## Motif and sequence tools

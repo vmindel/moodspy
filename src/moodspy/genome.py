@@ -388,6 +388,16 @@ def regions_frame(regions: Any) -> pd.DataFrame:
     pyranges' ``Chromosome/Start/End`` work), a pyranges object, a BED file
     path, or region strings such as ``"chr1:100-200"`` / ``"chr1-100-200"``.
     Coordinates are 0-based, half-open (BED convention).
+
+    Region names (the returned index) follow one rule for DataFrame input:
+    an integer-dtype index, ``RangeIndex`` or not, is treated as positional
+    and replaced by ``chrom:start-end``; any other index (strings, for
+    instance) is kept as given. A subset such as ``peaks.iloc[[2]]`` or
+    ``peaks[peaks.score > 5]`` is therefore named by its coordinates whatever
+    index type pandas hands back. To keep integer IDs, convert them first
+    (``df.index = df.index.astype(str)``); to name regions by a column, use
+    ``df.set_index("name")``. A BED file keeps its name column when every row
+    has a unique one, and region strings are kept verbatim.
     """
     if hasattr(regions, "df") and not isinstance(regions, pd.DataFrame):  # pyranges < 1
         regions = regions.df
@@ -409,7 +419,8 @@ def regions_frame(regions: Any) -> pd.DataFrame:
             },
             index=regions.index,
         )
-        if isinstance(out.index, pd.RangeIndex):
+        # not isinstance(RangeIndex): pandas 2 and 3 disagree on when a subset keeps one
+        if pd.api.types.is_integer_dtype(out.index.dtype):
             out.index = region_names(out)
         return out
     strings = [str(r) for r in regions]

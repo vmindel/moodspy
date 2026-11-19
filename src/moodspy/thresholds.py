@@ -39,8 +39,12 @@ def _min_delta(pssm):
 
 
 @numba.njit(nogil=True, cache=True)
-def _threshold_kernel(pssm, bg, p, precision):
-    """``pssm`` is ``(length, 4)``; returns the score threshold."""
+def _null_distribution(pssm, bg, precision):
+    """Exact null distribution of the grid-rounded score of ``pssm`` (``(length, 4)``).
+
+    Returns ``(table, offset)``: ``table[r]`` is the probability that the
+    rounded score (in grid units) equals ``r + offset``.
+    """
     n = pssm.shape[0]
     a = pssm.shape[1]
     mat = np.empty((n, a), dtype=np.int64)
@@ -78,7 +82,15 @@ def _threshold_kernel(pssm, bg, p, precision):
         for r in range(reach + 1):
             table0[r] = table1[r]
             table1[r] = 0.0
+    return table0, n * min_v
 
+
+@numba.njit(nogil=True, cache=True)
+def _threshold_kernel(pssm, bg, p, precision):
+    """``pssm`` is ``(length, 4)``; returns the score threshold."""
+    n = pssm.shape[0]
+    table0, offset = _null_distribution(pssm, bg, precision)
+    r_max = table0.shape[0] - 1
     total = table0[r_max]
     if total > p:
         best = 0.0
@@ -88,11 +100,72 @@ def _threshold_kernel(pssm, bg, p, precision):
     for r in range(r_max - 1, -1, -1):
         total += table0[r]
         if total > p:
-            return (r + n * min_v + 1) / precision
+            return (r + offset + 1) / precision
     worst = 0.0
     for i in range(n):
         worst += pssm[i].min()
     return worst - 1.0
+
+
+@numba.njit(nogil=True, cache=True)
+def _upper_tail(pssm, bg, precision):
+    """``(tail, offset)`` with ``tail[r] = P(grid score >= r + offset)``.
+
+    Summed from the top in the same order as ``_threshold_kernel``, so a
+    score reaches the ``p`` threshold exactly when its tail is ``<= p``.
+    """
+    table0, offset = _null_distribution(pssm, bg, precision)
+    tail = np.empty_like(table0)
+    total = 0.0
+    for r in range(table0.shape[0] - 1, -1, -1):
+        total += table0[r]
+        tail[r] = total
+    return tail, offset
+
+
+def pvalues_from_scores(
+    pwm: Any,
+    scores: Any,
+    background: Any = None,
+    precision: float = DEFAULT_PRECISION,
+) -> np.ndarray:
+    """Upper-tail p-values of log-odds scores under the background model.
+
+    Uses the same rounded-score null distribution as
+    [`threshold_from_p`][moodspy.threshold_from_p], so for any cutoff ``p``
+    a score is ``>= threshold_from_p(pwm, p)`` exactly when its p-value is
+    ``<= p``. (The one exception is MOODS' rule for a cutoff below the
+    probability of the single best word: the best word is then still a hit.)
+
+    Parameters
+    ----------
+    pwm
+        ``(4, length)`` log-odds score matrix (rows A, C, G, T).
+    scores
+        Scores of sites of the motif's length; NaN stays NaN.
+    background
+        Nucleotide frequencies the p-value refers to (default uniform).
+    precision
+        Grid steps per score unit used for the dynamic programme.
+    """
+    mat = np.ascontiguousarray(np.asarray(pwm, dtype=np.float64).T)
+    if mat.ndim != 2 or mat.shape[1] != 4:
+        raise ValueError("pwm must be a (4, length) matrix")
+    bg = np.full(4, 0.25) if background is None else check_background(background)
+    tail, offset = _upper_tail(mat, bg, float(precision))
+    return _lookup_tail(tail, offset, np.asarray(scores, dtype=np.float64), float(precision))
+
+
+def _lookup_tail(tail: np.ndarray, offset: int, scores: np.ndarray, precision: float) -> np.ndarray:
+    out = np.full(scores.shape, np.nan)
+    ok = ~np.isnan(scores)
+    # Thresholds are grid points K / precision, and for integer K
+    # score * precision >= K  <=>  floor(score * precision) >= K. The small
+    # slack absorbs summation-order rounding (~1e-14) of scores on a grid point.
+    idx = np.floor(scores[ok] * precision + 1e-9) - offset
+    # clip: summed float scores can exceed the best rounded score by rounding error
+    out[ok] = tail[np.clip(idx, 0, tail.shape[0] - 1).astype(np.int64)]
+    return out
 
 
 def threshold_from_p(

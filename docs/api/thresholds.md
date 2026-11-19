@@ -8,3 +8,5 @@
 ::: moodspy.threshold_from_p
 
 ::: moodspy.thresholds_from_p
+
+::: moodspy.pvalues_from_scores

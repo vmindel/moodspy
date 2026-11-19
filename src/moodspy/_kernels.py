@@ -298,6 +298,74 @@ def scan_summary(
 
 
 @numba.njit(nogil=True, cache=True)
+def dense_scores(codes, run, lo, hi, sel, mat_flat, mat_off, mat_len, out):
+    """Score every placement starting in ``[lo, hi)`` for matrices ``sel``.
+
+    ``out[j, i]`` gets the score of matrix ``sel[j]`` at absolute position
+    ``i``, or NaN when the window runs past the sequence end or contains a
+    non-ACGT character. Columns are summed left to right.
+    """
+    for j in range(sel.shape[0]):
+        k = sel[j]
+        m = mat_len[k]
+        off = mat_off[k]
+        for i in range(lo, hi):
+            if run[i] < m:
+                out[j, i] = np.nan
+                continue
+            s = 0.0
+            for c in range(m):
+                s += mat_flat[off + c * 4 + codes[i + c]]
+            out[j, i] = s
+
+
+@numba.njit(nogil=True, cache=True)
+def collect_tracks(dense, offsets, n_motifs, row_rev, best):
+    """Flatten dense placement scores into rows ordered by (seq, motif, strand, start).
+
+    ``dense`` rows are ``strand_block * n_motifs + motif``; ``row_rev[r]``
+    says whether row ``r`` is the reverse strand. With ``best``, ``dense``
+    holds a forward block then a reverse block and each placement gives one
+    row with the higher score (ties go to ``+``). NaN placements are skipped.
+    """
+    n_blocks = dense.shape[0] // n_motifs
+    out_blocks = 1 if best else n_blocks
+    n = 0
+    for r in range(out_blocks * n_motifs):
+        for i in range(dense.shape[1]):
+            if not np.isnan(dense[r, i]):
+                n += 1
+    o_seq = np.empty(n, dtype=np.int64)
+    o_mot = np.empty(n, dtype=np.int64)
+    o_pos = np.empty(n, dtype=np.int64)
+    o_rev = np.empty(n, dtype=np.int8)
+    o_score = np.empty(n, dtype=np.float64)
+    t = 0
+    for s in range(offsets.shape[0] - 1):
+        a = offsets[s]
+        for j in range(n_motifs):
+            for b in range(out_blocks):
+                r = b * n_motifs + j
+                for i in range(a, offsets[s + 1]):
+                    v = dense[r, i]
+                    if np.isnan(v):
+                        continue
+                    rev = row_rev[r]
+                    if best:
+                        w = dense[n_motifs + j, i]
+                        if w > v:
+                            v = w
+                            rev = True
+                    o_seq[t] = s
+                    o_mot[t] = j
+                    o_pos[t] = i - a
+                    o_rev[t] = 1 if rev else 0
+                    o_score[t] = v
+                    t += 1
+    return o_seq, o_mot, o_pos, o_rev, o_score
+
+
+@numba.njit(nogil=True, cache=True)
 def _grow_i64(arr, cap):
     out = np.empty(cap, dtype=np.int64)
     out[: arr.shape[0]] = arr

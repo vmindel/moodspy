@@ -1,6 +1,6 @@
 ---
 name: moodspy
-description: Use for any task involving the moodspy library — PWM / transcription-factor motif matching in Python (a rewrite of MOODS with a motifmatchr-style API, plus a port of universalmotif). Triggers on scanning sequences, peaks, BED files or a genome FASTA for motif hits; motif x peak matrices for chromVAR-style or scATAC analysis; hit positions; p-value thresholds; reading or writing JASPAR, MEME, HOMER or TRANSFAC motifs; backgrounds; comparing, merging, clustering, trimming or plotting motifs (logos, Tomtom-style matching against a database); k-mer backgrounds, shuffled or simulated sequences, implanting motifs; porting R motifmatchr, universalmotif or MOODS-python code. This is a router skill — read the relevant file under references/ before writing moodspy code.
+description: Use for any task involving the moodspy library — PWM / transcription-factor motif matching in Python (a rewrite of MOODS with a motifmatchr-style API, plus a port of universalmotif). Triggers on scanning sequences, peaks, BED files or a genome FASTA for motif hits; motif x peak matrices for chromVAR-style or scATAC analysis; hit positions; per-position score / p-value tracks along peaks and bedGraph export; p-value thresholds; reading or writing JASPAR, MEME, HOMER or TRANSFAC motifs; backgrounds; comparing, merging, clustering, trimming or plotting motifs (logos, Tomtom-style matching against a database); k-mer backgrounds, shuffled or simulated sequences, implanting motifs; porting R motifmatchr, universalmotif or MOODS-python code. This is a router skill — read the relevant file under references/ before writing moodspy code.
 ---
 
 # moodspy
@@ -18,6 +18,7 @@ columns in pandas groupby.
 | task | read |
 |---|---|
 | **`match_motifs`**: inputs it accepts, `out=` modes, the `MotifMatches` result, positions DataFrame | `references/match-motifs.md` |
+| **score tracks**: score / p-value at every position along peaks (no threshold), `motif_tracks`, `write_bedgraph`, `moodspy track` | `references/score-tracks.md` |
 | **peaks / regions + genome FASTA**: coordinates, BED, chrom names, `FastaFile`, pysam/pyfaidx | `references/genomes-regions.md` |
 | **scATAC / AnnData**: peaks x motifs matrix into `adata.varm`, per-cell motif counts | `references/single-cell-atac.md` |
 | **motifs**: building `Motif`, counts vs probabilities vs log-odds, pseudocounts, labels, file formats | `references/motifs-io.md` |

@@ -134,6 +134,65 @@ print(best[["seq", "motif", "start", "score"]])
 3  chr2:19750-20250  MA0107.1_RELA  20000  17.117718
 ```
 
+## Motif score tracks
+
+Hits answer "where does the motif pass the cutoff". To see a motif's affinity along the
+whole peak instead, for example as a track under ChEC-seq or ATAC coverage,
+`mp.motif_tracks` scores every placement with a 1 bp step and no threshold. `select=`
+picks motifs by label, ID or name. Pass the background of the scan you compare against,
+because `bg="subject"` would take it from these peaks only:
+
+```python
+tracks = mp.motif_tracks(motifs, peaks.iloc[[2]], genome="toy_genome.fa",
+                         select=["RELA"], bg=res.background)
+print(tracks.head(3))
+print(len(tracks), "placements;", tracks.attrs["thresholds"].round(3).to_dict())
+```
+
+```text
+           motif               seq chrom  start    end strand      score    pvalue
+0  MA0107.1_RELA  chr2:19750-20250  chr2  19750  19760      +  -7.133295  0.039919
+1  MA0107.1_RELA  chr2:19750-20250  chr2  19751  19761      -  -5.668945  0.028187
+2  MA0107.1_RELA  chr2:19750-20250  chr2  19752  19762      - -14.118026  0.165531
+491 placements; {'MA0107.1_RELA': 11.034}
+```
+
+Every row is one placement. `start`/`end` are its window in genome coordinates, `strand`
+is the better-scoring strand (`strand="both"` keeps one row per strand), and `pvalue` is
+the upper tail of the score under the background. The p-values come from the same null
+distribution as the thresholds, so `pvalue <= p_cutoff` picks out exactly the hits
+`match_motifs` reports:
+
+```python
+called = tracks[tracks["pvalue"] <= 5e-5]
+print(called[["start", "end", "strand", "score", "pvalue"]])
+```
+
+```text
+     start    end strand      score        pvalue
+24   19774  19784      +  12.769978  2.074547e-05
+250  20000  20010      +  17.117718  8.078957e-07
+251  20001  20011      -  11.908685  2.980877e-05
+```
+
+For a genome browser, IGV or plotgardener, write a bedGraph with one value per base, at
+the centre of each motif window. Use `value="neglog10p"` to put motifs of different
+lengths on one scale. Overlapping peaks would give a base two values and raise an error,
+so merge them first:
+
+```python
+mp.write_bedgraph(tracks, "rela.bedgraph", value="neglog10p")
+print(open("rela.bedgraph").readlines()[:2])
+```
+
+```text
+['chr2\t19755\t19756\t1.39882\n', 'chr2\t19756\t19757\t1.54995\n']
+```
+
+The command line does the same: `moodspy track -m motifs.jaspar -r peaks.bed -g hg38.fa
+--select CTCF,KLF5 --bedgraph -o 'tracks.{motif}.bedgraph'` writes one file per motif.
+Output grows with bases × motifs, so select the motifs you want to plot.
+
 ## Genome background
 
 `bg="genome"` uses the base composition of the whole FASTA. The counts take 1–2 s to compute

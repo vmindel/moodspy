@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
@@ -14,7 +14,7 @@ import scipy.sparse as sp
 from . import _kernels
 from ._alphabet import encode_many
 from .motifs import DEFAULT_PSEUDOCOUNT, Motif, as_motif_list, check_background, motif_labels
-from .thresholds import DEFAULT_PRECISION, thresholds_from_p
+from .thresholds import DEFAULT_PRECISION, _lookup_tail, _upper_tail, thresholds_from_p
 
 #: Sequences longer than this are split into pieces scanned in parallel.
 SPLIT_LENGTH = 1_000_000
@@ -90,6 +90,7 @@ class Scanner:
         self.labels = motif_labels(self.motifs)
         self.background = np.full(4, 0.25) if background is None else check_background(background)
         self.p_cutoff = p_cutoff
+        self.precision = float(precision)
         self.w = None if w is None else int(w)
         self.n_jobs = _resolve_jobs(n_jobs)
         self.pwms = [
@@ -310,6 +311,105 @@ class Scanner:
         counts = sp.csr_matrix((cnt.astype(np.int32), (rows, cols)), shape=shape)
         scores = sp.csr_matrix((best, (rows, cols)), shape=shape)
         return counts, scores
+
+
+    def tracks(
+        self,
+        seqs: Sequence[str],
+        *,
+        strand: Literal["best", "both", "+", "-"] = "best",
+        pvalues: bool = True,
+    ) -> pd.DataFrame:
+        """Score of every motif at every position (no threshold).
+
+        One row per (sequence, motif, placement) for every placement whose
+        window lies inside the sequence and contains only ``ACGT``; the last
+        ``length - 1`` positions of each sequence have no row.
+
+        Parameters
+        ----------
+        seqs
+            Sequences to score.
+        strand
+            ``"best"``: one row per placement with the higher of the two
+            strand scores and the strand it came from. ``"both"``: one row
+            per strand. ``"+"`` / ``"-"``: that strand only.
+        pvalues
+            Add a ``pvalue`` column: the upper-tail probability of the
+            score under the background, from the same null distribution as
+            the thresholds (so ``pvalue <= p_cutoff`` exactly when
+            ``score >= threshold``). Both strands use the forward matrix's
+            distribution, as the thresholds do. With ``strand="best"`` it
+            is the p-value of the better strand, not corrected for taking
+            the best of two.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Columns ``seq, motif, start, end, strand, score[, pvalue]``,
+            sorted by sequence, motif, strand and start. ``start``/``end``
+            are the placement's window on the forward strand, as in
+            [`scan`][moodspy.Scanner.scan].
+        """
+        if strand not in ("best", "both", "+", "-"):
+            raise ValueError("strand must be 'best', 'both', '+' or '-'")
+        if isinstance(seqs, str):
+            seqs = [seqs]
+        codes, offsets, run, _ = self._prepare(seqs, SPLIT_LENGTH)
+        n_m, n = self.n_motifs, codes.shape[0]
+        strands = ["+", "-"] if strand in ("best", "both") else [strand]
+        sel = np.array([k + (n_m if s == "-" else 0) for s in strands for k in range(n_m)], dtype=np.int64)
+        dense = np.empty((sel.size, n), dtype=np.float64)
+        n_chunks = 1 if self.n_jobs == 1 or n < 100_000 else self.n_jobs * 4
+        edges = np.linspace(0, n, n_chunks + 1).astype(np.int64)
+        args = (sel, self._mat_flat, self._mat_off, self._mat_len, dense)
+        if n_chunks == 1:
+            _kernels.dense_scores(codes, run, 0, n, *args)
+        else:
+            with ThreadPoolExecutor(max_workers=self.n_jobs) as pool:
+                for f in [pool.submit(_kernels.dense_scores, codes, run, edges[c], edges[c + 1], *args)
+                          for c in range(n_chunks)]:
+                    f.result()
+        row_rev = sel >= n_m
+        s_idx, motif, start, reverse, score = _kernels.collect_tracks(
+            dense, offsets, n_m, row_rev, strand == "best"
+        )
+        out = pd.DataFrame(
+            {
+                "seq": s_idx,
+                "motif": pd.Categorical.from_codes(motif, categories=self.labels),
+                "start": start,
+                "end": start + self._mat_len[:n_m][motif],
+                "strand": pd.Categorical.from_codes(reverse, categories=["+", "-"]),
+                "score": score,
+            }
+        )
+        if pvalues:
+            out["pvalue"] = self._pvalues(motif, score)
+        return out
+
+    def _pvalues(self, motif: np.ndarray, score: np.ndarray) -> np.ndarray:
+        """P-value of each ``score`` under the null of forward matrix ``motif``."""
+        pv = np.empty_like(score)
+        order = np.argsort(motif, kind="stable")
+        bounds = np.searchsorted(motif[order], np.arange(self.n_motifs + 1))
+        for k, (tail, off) in enumerate(self._tails()):
+            idx = order[bounds[k] : bounds[k + 1]]
+            pv[idx] = _lookup_tail(tail, off, score[idx], self.precision)
+        return pv
+
+    def _tails(self) -> list[tuple[np.ndarray, int]]:
+        """Null upper-tail arrays of the forward matrices (computed per call;
+        they can be megabytes each, so they are not kept)."""
+        bg, prec = self.background, self.precision
+
+        def one(k):
+            return _upper_tail(self._mats[k], bg, prec)
+
+        if self.n_jobs == 1 or self.n_motifs < 2:
+            return [one(k) for k in range(self.n_motifs)]
+        with ThreadPoolExecutor(max_workers=self.n_jobs) as pool:
+            return list(pool.map(one, range(self.n_motifs)))
 
 
 def _window_position(ed: np.ndarray, w: int) -> int:

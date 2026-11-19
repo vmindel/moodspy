@@ -52,7 +52,8 @@ from .sequences import (
     shuffle_sequences,
     write_fasta,
 )
-from .thresholds import threshold_from_p, thresholds_from_p
+from .thresholds import pvalues_from_scores, threshold_from_p, thresholds_from_p
+from .tracks import motif_tracks, select_motifs, write_bedgraph
 
 try:
     __version__ = version("moodspy")
@@ -67,19 +68,23 @@ __all__ = [
     "check_background",
     "example_motifs",
     "match_motifs",
+    "motif_tracks",
     "parse_hocomoco",
     "parse_homer",
     "parse_jaspar",
     "parse_meme",
     "parse_pfm",
     "parse_transfac",
+    "pvalues_from_scores",
     "read_bed",
     "read_fasta",
     "read_motifs",
     "regions_frame",
     "remove_overlaps",
+    "select_motifs",
     "threshold_from_p",
     "thresholds_from_p",
+    "write_bedgraph",
     "write_jaspar",
     "write_meme",
 ]

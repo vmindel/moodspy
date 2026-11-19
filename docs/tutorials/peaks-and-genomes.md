@@ -143,7 +143,7 @@ picks motifs by label, ID or name. Pass the background of the scan you compare a
 because `bg="subject"` would take it from these peaks only:
 
 ```python
-tracks = mp.motif_tracks(motifs, peaks.iloc[2:3], genome="toy_genome.fa",
+tracks = mp.motif_tracks(motifs, peaks.iloc[[2]], genome="toy_genome.fa",
                          select=["RELA"], bg=res.background)
 print(tracks.head(3))
 print(len(tracks), "placements;", tracks.attrs["thresholds"].round(3).to_dict())

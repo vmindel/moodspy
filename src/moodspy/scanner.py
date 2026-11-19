@@ -389,27 +389,29 @@ class Scanner:
         return out
 
     def _pvalues(self, motif: np.ndarray, score: np.ndarray) -> np.ndarray:
-        """P-value of each ``score`` under the null of forward matrix ``motif``."""
+        """P-value of each ``score`` under the null of forward matrix ``motif``.
+
+        Null tail arrays can be megabytes each, so they are built ``n_jobs``
+        at a time and dropped once used.
+        """
         pv = np.empty_like(score)
         order = np.argsort(motif, kind="stable")
         bounds = np.searchsorted(motif[order], np.arange(self.n_motifs + 1))
-        for k, (tail, off) in enumerate(self._tails()):
-            idx = order[bounds[k] : bounds[k + 1]]
-            pv[idx] = _lookup_tail(tail, off, score[idx], self.precision)
-        return pv
-
-    def _tails(self) -> list[tuple[np.ndarray, int]]:
-        """Null upper-tail arrays of the forward matrices (computed per call;
-        they can be megabytes each, so they are not kept)."""
         bg, prec = self.background, self.precision
 
         def one(k):
-            return _upper_tail(self._mats[k], bg, prec)
+            tail, off = _upper_tail(self._mats[k], bg, prec)
+            idx = order[bounds[k] : bounds[k + 1]]
+            pv[idx] = _lookup_tail(tail, off, score[idx], prec)
 
         if self.n_jobs == 1 or self.n_motifs < 2:
-            return [one(k) for k in range(self.n_motifs)]
-        with ThreadPoolExecutor(max_workers=self.n_jobs) as pool:
-            return list(pool.map(one, range(self.n_motifs)))
+            for k in range(self.n_motifs):
+                one(k)
+        else:
+            with ThreadPoolExecutor(max_workers=self.n_jobs) as pool:
+                for _ in pool.map(one, range(self.n_motifs)):
+                    pass
+        return pv
 
 
 def _window_position(ed: np.ndarray, w: int) -> int:

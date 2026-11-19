@@ -46,7 +46,7 @@ usage: moodspy track [-h] -m MOTIFS [--select SELECT] (-s SEQUENCES | -r REGIONS
 |---|---|
 | `--select` | comma-separated motif labels, IDs or names (default: all motifs) |
 | `--strand` | `best` (higher-scoring strand per placement, default), `both`, `+` or `-` |
-| `-p, --p-cutoff` | only fills the `hit` column (`pvalue <= cutoff`); nothing is filtered |
+| `-p, --p-cutoff` | only fills the `hit` column (`score >=` the threshold for this p-value, as in `moodspy scan`); nothing is filtered |
 | `-o, --output` | TSV (default stdout); with `--bedgraph`, a path containing `{motif}` |
 | `--bedgraph` | write one bedGraph per motif instead of a TSV |
 | `--value` | bedGraph value: `score`, `pvalue` or `neglog10p` |

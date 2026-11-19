@@ -62,7 +62,7 @@ def build_parser() -> argparse.ArgumentParser:
     t.add_argument("--strand", choices=["best", "both", "+", "-"], default="best",
                    help="best: higher-scoring strand per position (default); both: one row per strand")
     t.add_argument("-p", "--p-cutoff", type=float, default=5e-5,
-                   help="only sets the 'hit' column (pvalue <= cutoff); nothing is filtered")
+                   help="only sets the 'hit' column (score >= threshold at this p); nothing is filtered")
     t.add_argument("--pseudocount", type=float, default=0.8)
     t.add_argument("--motifmatchr-compat", action="store_true",
                    help="reproduce motifmatchr scores exactly (inverted background correction)")
@@ -104,7 +104,9 @@ def _track(args) -> int:
     except (KeyError, ValueError) as err:
         print(f"moodspy: {err.args[0] if err.args else err}", file=sys.stderr)
         return 2
-    res["hit"] = res["pvalue"] <= args.p_cutoff
+    # the scanner's own rule, so short motifs whose best word misses -p match `moodspy scan`
+    thr = res.attrs["thresholds"]
+    res["hit"] = res["score"].to_numpy() >= thr.to_numpy()[res["motif"].cat.codes.to_numpy()]
     dest = sys.stdout if args.output == "-" else args.output
     res.to_csv(dest, sep="\t", index=False, float_format="%.6g")
     return 0

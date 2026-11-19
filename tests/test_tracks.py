@@ -148,8 +148,24 @@ def test_cli_track(tmp_path):
     t = pd.read_csv(out, sep="\t")
     assert list(t.columns) == ["motif", "seq", "start", "end", "strand", "score", "pvalue", "hit"]
     assert set(t["motif"]) == {"MA0599.1_KLF5", "MA0107.1_RELA"}
-    assert (t["hit"] == (t["pvalue"] <= 5e-5)).all()
+    assert main(["scan", "-m", str(DATA / "motifs.jaspar"), "-s", str(DATA / "seqs.fa"),
+                 "-o", str(tmp_path / "hits.tsv")]) == 0
+    hits = pd.read_csv(tmp_path / "hits.tsv", sep="\t")
+    hits = hits[hits["motif"].isin(["MA0599.1_KLF5", "MA0107.1_RELA"])]
+    called = t[t["hit"]]
+    # strand="best" keeps one strand per placement, so compare placements
+    assert set(zip(called["seq"], called["motif"], called["start"])) == set(zip(hits["seq"], hits["motif"], hits["start"]))
     assert main(args + ["--select", "KLF5", "--bedgraph", "-o", str(tmp_path / "x.bg")]) == 2
     assert main(args + ["--select", "KLF5", "--bedgraph", "-o", str(tmp_path / "{motif}.bg")]) == 0
     assert (tmp_path / "MA0599.1_KLF5.bg").is_file()
     assert main(args + ["--select", "NOPE"]) == 2
+
+
+def test_threaded_tracks_equal_single_thread(rng):
+    motifs = [rng.integers(0, 30, size=(4, n)).astype(float) for n in (4, 9, 21)]
+    seqs = random_seqs(rng, 400, min_len=200, max_len=800)  # > 100 kb, so the dense kernel is chunked
+    assert sum(map(len, seqs)) > 150_000
+    for strand in ("best", "both", "-"):
+        one = mp.Scanner(motifs, [0.3, 0.2, 0.2, 0.3], n_jobs=1).tracks(seqs, strand=strand)
+        many = mp.Scanner(motifs, [0.3, 0.2, 0.2, 0.3], n_jobs=4).tracks(seqs, strand=strand)
+        pd.testing.assert_frame_equal(one, many)

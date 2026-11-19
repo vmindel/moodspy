@@ -68,5 +68,6 @@ moodspy track -m motifs.jaspar -r peaks.bed -g hg38.fa --select CTCF --bedgraph 
     --value neglog10p -o 'tracks.{motif}.bedgraph'
 ```
 
-The TSV adds a boolean `hit` column (`pvalue <= -p`). `--bedgraph` without `{motif}` in
+The TSV adds a boolean `hit` column: `score >=` the threshold for `-p`, the same rule
+as `moodspy scan`, so it also covers the short-motif exception above. `--bedgraph` without `{motif}` in
 `-o` exits with status 2.

@@ -71,6 +71,37 @@ def test_regions_frame_variants(tmp_path):
         mp.regions_frame(["nonsense"])
 
 
+def test_region_names_ignore_integer_index_type(tmp_path, rng):
+    """pandas 2 returns Index([2]) for peaks.iloc[[2]], pandas 3 a RangeIndex: names must not differ."""
+    peaks = pd.DataFrame({"chrom": ["chr1", "chr1", "chr2", "chr2"],
+                          "start": [10, 50, 20, 70], "end": [40, 90, 60, 110]})
+    row = peaks.iloc[[2]]
+    as_range = row.set_axis(pd.RangeIndex(2, 3), axis=0)
+    as_int = row.set_axis(pd.Index([2], dtype="int64"), axis=0)
+    assert type(as_range.index) is pd.RangeIndex and type(as_int.index) is not pd.RangeIndex
+    expected = ["chr2:20-60"]
+    for sub in (as_range, as_int, row, row.set_axis(pd.Index([2], dtype="uint32"), axis=0)):
+        assert mp.regions_frame(sub).index.tolist() == expected
+    # a non-contiguous mask leaves an integer index under both pandas versions
+    assert mp.regions_frame(peaks[peaks.start != 50]).index.tolist() == [
+        "chr1:10-40", "chr2:20-60", "chr2:70-110"]
+    # non-integer indexes are names the user chose
+    named = peaks.set_axis([f"p{i}" for i in range(4)], axis=0)
+    assert mp.regions_frame(named.iloc[[2]]).index.tolist() == ["p2"]
+    assert mp.regions_frame(peaks.set_axis(peaks.index.astype(str), axis=0)).index.tolist() == list("0123")
+
+    write_fasta(tmp_path / "g.fa", {c: "".join(rng.choice(list("ACGT"), size=200)) for c in ("chr1", "chr2")})
+    motif = mp.create_motif("ACGT")
+    kw = dict(genome=tmp_path / "g.fa", bg="even", p_cutoff=1.0)
+    r_range = mp.match_motifs(motif, as_range, out="positions", **kw)
+    r_int = mp.match_motifs(motif, as_int, out="positions", **kw)
+    assert len(r_range) > 0
+    pd.testing.assert_frame_equal(r_range, r_int)
+    m_range = mp.match_motifs(motif, as_range, **kw)
+    m_int = mp.match_motifs(motif, as_int, **kw)
+    assert m_range.sequences.index.tolist() == m_int.sequences.index.tolist() == expected
+
+
 def test_build_fai_offsets():
     import mmap
     import tempfile

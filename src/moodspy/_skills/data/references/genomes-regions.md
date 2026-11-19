@@ -51,8 +51,13 @@ mp.regions_frame(df)                      # normalise any DataFrame / pyranges /
   Extra columns are dropped from `res.sequences`. Join them back on the
   index if you need them.
 - Region strings may contain thousands separators: `chr1:1,000-2,000`.
-- A DataFrame with a non-default index keeps that index as the region
-  names. A `RangeIndex` is replaced by `chrom:start-end`.
+- Region names for a DataFrame: an integer index (default `RangeIndex` or
+  the integer index left by `iloc`, boolean masks, `sort_values`...) is
+  replaced by `chrom:start-end`; any other index, e.g. strings, is kept.
+  The rule does not depend on the pandas version, so `peaks.iloc[[2]]` is
+  named `chr2:19750-20250` under pandas 2 and 3. To keep integer IDs, use
+  `df.index = df.index.astype(str)`; to name regions by a column, use
+  `df.set_index("name")`.
 - Fixed-width peaks: build the summit windows yourself before calling
   `match_motifs`, e.g. `start = summit - 100; end = summit + 100`.
   moodspy does not resize regions.
